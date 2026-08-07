@@ -1,6 +1,7 @@
 import { Plus, Settings } from 'lucide-react'
 
 export default function TopNav({
+  pageTitle,
   viewMode,
   onViewModeChange,
   projectName,
@@ -14,7 +15,7 @@ export default function TopNav({
         <p className="text-xs text-gray-500">
           {projectName} / <span className="text-gray-700">PI 26.2 – 26.4</span>
         </p>
-        <h1 className="text-lg font-semibold text-gray-900">PI Timeline</h1>
+        <h1 className="text-lg font-semibold text-gray-900">{pageTitle}</h1>
       </div>
 
       <div className="flex items-center gap-3">

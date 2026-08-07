@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { User } from 'lucide-react'
+import { APP_NAME, APP_SLOGAN, APP_TAGLINE } from '../brand'
 
 export default function ActorSetup({ actor, onSave }) {
   const [name, setName] = useState(actor)
@@ -27,10 +28,14 @@ export default function ActorSetup({ actor, onSave }) {
             <User size={20} />
           </div>
           <div>
+            <p className="text-xs font-medium text-violet-600">
+              {APP_NAME} · {APP_TAGLINE}
+            </p>
             <h2 className="text-lg font-semibold text-gray-900">Who are you?</h2>
             <p className="text-sm text-gray-500">
               Enter your name to record changes on the timeline.
             </p>
+            <p className="mt-1 text-xs italic text-gray-400">{APP_SLOGAN}</p>
           </div>
         </div>
 

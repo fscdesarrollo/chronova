@@ -1,4 +1,4 @@
-# Free Hosting Proposal — PI Timeline
+# Free Hosting Proposal — Chronova
 
 How to host this app at **$0/month** for a small internal team (executives, POs, RTEs, leads), with no custom domain and light usage.
 
@@ -31,7 +31,7 @@ Single vendor, always-on on the free tier, no database pause after inactivity.
 - **Single platform:** Frontend, API, and database under one Cloudflare account.
 - **Always responsive:** Unlike some free Postgres hosts, D1 does not pause when unused — important for a tool opened sporadically before PI reviews.
 - **Performance:** Global CDN; fast loads on desktop (primary) and mobile.
-- **URL included:** Something like `pi-timeline.pages.dev` (rename the project in Cloudflare settings).
+- **URL included:** Something like `chronova.pages.dev` (rename the project in Cloudflare settings).
 
 ### Free tier limits (more than enough for one team)
 

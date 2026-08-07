@@ -1,6 +1,10 @@
-# PI Timeline — Project Definition
+# Chronova — Project Definition
 
-**Codename:** pi-timeline
+**Product name:** Chronova  
+**Tagline:** Adaptive Planning Timeline  
+**Package name:** `chronova` (repo folder may still be `pi-timeline` until renamed on GitHub)
+
+Brand guidelines, slogan, and philosophy: [brand.md](brand.md).
 
 A lightweight internal web app for tracking team features across Program Increments (PI) using a simple Gantt-style timeline. Oriented to executives and stakeholders — not a replacement for Jira or Azure DevOps.
 
@@ -461,9 +465,9 @@ All data lives in the browser until MVP 3 adds a backend:
 | Projects, teams, project_teams, products, project_products | Serialized to `localStorage` |
 | Features, US, baselines | Serialized to `localStorage` |
 | Audit events | Appended in `localStorage` (same structure as future DB model) |
-| Actor name | `localStorage` key `pi-timeline-actor` |
+| Actor name | `localStorage` key `chronova-actor` |
 | Layout preferences | Sidebar collapsed state, left column width, feature panel collapsed |
-| Timeline scroll position | Per-project view (`pi-timeline-view`); saved on leaving Timeline page; defaults to Today on first visit |
+| Timeline scroll position | Per-project view (`chronova-view`); saved on leaving Timeline page; defaults to Today on first visit |
 | Timeline markers | Per-project markers (`timelineMarkers` in main state) |
 | PI/sprint calendar | Static seed data in code; dynamic weeks when unconfigured |
 | Multi-user sharing | Not supported — each browser has its own copy |
@@ -682,7 +686,7 @@ These were not explicitly discussed but are assumed unless changed:
 |-------|---------|
 | Architecture (MVP 1.5) | Frontend-only SPA, no backend |
 | Data persistence | `localStorage` — projects, teams, products, features, baselines, audit events, layout |
-| Actor storage | `localStorage` key `pi-timeline-actor` |
+| Actor storage | `localStorage` key `chronova-actor` |
 | Left column width | Default 280px; min 200px, max 720px; collapsed 52px; persisted in `localStorage` |
 | Sidebar | Collapsible; state persisted |
 | Move reason | **TBD (MVP 2)** — required or optional |

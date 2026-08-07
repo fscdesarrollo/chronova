@@ -6,6 +6,7 @@ import {
   Package,
   Users,
 } from 'lucide-react'
+import { APP_NAME, APP_TAGLINE } from '../brand'
 
 const NAV_ITEMS = [
   { id: 'timeline', icon: BarChart3, label: 'Timeline' },
@@ -39,8 +40,18 @@ export default function Sidebar({
       }`}
     >
       <div className="flex items-center justify-between border-b border-white/10 px-2 py-3">
-        {!collapsed && (
-          <span className="truncate px-2 text-sm font-semibold">PI Timeline</span>
+        {collapsed ? (
+          <span
+            className="mx-auto flex h-8 w-8 items-center justify-center rounded-lg bg-violet-600/30 text-sm font-bold text-violet-200"
+            title={`${APP_NAME} — ${APP_TAGLINE}`}
+          >
+            {APP_NAME[0]}
+          </span>
+        ) : (
+          <div className="min-w-0 px-2">
+            <p className="truncate text-sm font-semibold">{APP_NAME}</p>
+            <p className="truncate text-[10px] text-gray-500">{APP_TAGLINE}</p>
+          </div>
         )}
         <button
           type="button"

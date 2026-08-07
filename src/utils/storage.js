@@ -1,7 +1,30 @@
-const STORAGE_KEY = 'pi-timeline-data'
-const ACTOR_KEY = 'pi-timeline-actor'
-const LAYOUT_KEY = 'pi-timeline-layout'
-const TIMELINE_VIEW_KEY = 'pi-timeline-view'
+const STORAGE_KEY = 'chronova-data'
+const ACTOR_KEY = 'chronova-actor'
+const LAYOUT_KEY = 'chronova-layout'
+const TIMELINE_VIEW_KEY = 'chronova-view'
+
+const LEGACY_KEY_MAP = [
+  ['pi-timeline-data', STORAGE_KEY],
+  ['pi-timeline-actor', ACTOR_KEY],
+  ['pi-timeline-layout', LAYOUT_KEY],
+  ['pi-timeline-view', TIMELINE_VIEW_KEY],
+]
+
+function migrateStorageKeys() {
+  try {
+    for (const [legacyKey, newKey] of LEGACY_KEY_MAP) {
+      const legacyValue = localStorage.getItem(legacyKey)
+      if (legacyValue !== null && localStorage.getItem(newKey) === null) {
+        localStorage.setItem(newKey, legacyValue)
+      }
+      if (legacyValue !== null) {
+        localStorage.removeItem(legacyKey)
+      }
+    }
+  } catch { /* ignore */ }
+}
+
+migrateStorageKeys()
 
 const DEFAULT_LAYOUT = {
   sidebarCollapsed: false,
