@@ -1,6 +1,10 @@
-# PI Timeline Prototype
+# Chronova
 
-Interactive prototype of a Program Increment (PI) Timeline tool with Gantt-style feature planning.
+**Adaptive Planning Timeline** — *See time. Shape what comes next.*
+
+A lightweight internal web app for tracking team features across Program Increments (PI) using a simple Gantt-style timeline. Oriented to executives and stakeholders — not a replacement for Jira or Azure DevOps.
+
+See [docs/brand.md](docs/brand.md) for the name meaning and product philosophy.
 
 ## Quick start
 

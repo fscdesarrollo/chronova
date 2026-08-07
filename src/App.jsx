@@ -10,6 +10,7 @@ import ActorSetup from './components/ActorSetup'
 import ProjectsPage from './components/pages/ProjectsPage'
 import TeamsPage from './components/pages/TeamsPage'
 import ProductsPage from './components/pages/ProductsPage'
+import { PAGE_TITLES } from './brand'
 import { useTimelineState } from './hooks/useTimelineState'
 
 export default function App() {
@@ -149,6 +150,7 @@ export default function App() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <TopNav
+          pageTitle={PAGE_TITLES[currentPage] ?? 'Timeline'}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           projectName={timeline.activeProject?.name}
