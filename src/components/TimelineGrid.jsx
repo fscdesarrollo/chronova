@@ -1,55 +1,337 @@
-import { useEffect } from 'react'
-import FeatureRow from './FeatureRow'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { FeatureBarRow, FeatureLabelRow } from './FeatureRow'
+import FeaturePanelHeader from './FeaturePanelHeader'
+import TeamSectionHeader from './TeamSectionHeader'
 import TimelineHeader from './TimelineHeader'
-import DragGhost, { WeekHighlight } from './DragGhost'
-import { useFeatureDrag, LEFT_COL_WIDTH, ROW_HEIGHT, WEEK_WIDTH } from '../hooks/useFeatureDrag'
-import { CURRENT_PI_START_WEEK, TOTAL_WEEKS } from '../data'
+import { TodayBodyLine, TimelineMarkerBodyLine } from './TimelineMarkers'
+import { useFeatureDrag, ROW_HEIGHT } from '../hooks/useFeatureDrag'
+import { useLeftColResize } from '../hooks/useLeftColResize'
+import { CURRENT_PI_START_WEEK, TOTAL_WEEKS, weekCalendar } from '../data'
+import { LEFT_COL_COLLAPSED_WIDTH, SECTION_ROW_HEIGHT, WEEK_WIDTH } from '../constants'
+import { loadTimelineView, saveTimelineView } from '../utils/storage'
+import {
+  getDateTimelinePosition,
+  getTodayTimelinePosition,
+  scrollLeftForToday,
+} from '../utils/weekCalendar'
+import { rowHeightFor } from '../utils/timelineLayout'
 
-export default function TimelineGrid({ features, setFeatures }) {
-  const { gridRef, drag, beginDrag, barWidth, barLeft, BAR_HEIGHT } = useFeatureDrag(
-    features,
-    setFeatures,
+function rowHeight(row) {
+  return rowHeightFor(row)
+}
+
+function buildMarkerLayout(markers, weekWidth) {
+  const withPos = markers
+    .map((marker) => ({
+      marker,
+      left: getDateTimelinePosition(weekCalendar, weekWidth, marker.date),
+    }))
+    .filter((item) => item.left != null)
+    .sort((a, b) => a.left - b.left || a.marker.label.localeCompare(b.marker.label))
+
+  const dateStacks = {}
+  return withPos.map((item) => {
+    const key = item.marker.date
+    const stackIndex = dateStacks[key] ?? 0
+    dateStacks[key] = stackIndex + 1
+    return { ...item, stackIndex }
+  })
+}
+
+export default function TimelineGrid({
+  projectId,
+  timelineRows,
+  markers = [],
+  scrollToDate,
+  onScrollToDateHandled,
+  leftColWidth,
+  leftColCollapsed,
+  onLeftColWidthChange,
+  onToggleLeftColCollapsed,
+  onMove,
+  selectedFeatureId,
+  onSelectFeature,
+  onDeselectFeature,
+}) {
+  const effectiveColWidth = leftColCollapsed ? LEFT_COL_COLLAPSED_WIDTH : leftColWidth
+  const leftBodyRef = useRef(null)
+  const headerScrollRef = useRef(null)
+  const scrollSyncRef = useRef(false)
+  const scrollInitializedRef = useRef(false)
+  const suppressScrollTrackingRef = useRef(false)
+  const shouldPersistViewRef = useRef(false)
+  const scrollPositionRef = useRef({ scrollLeft: 0, scrollTop: 0 })
+
+  const { gridRef, rowsRef, drag, beginDrag } = useFeatureDrag(timelineRows, onMove, 0)
+  const { startResize } = useLeftColResize({
+    onWidthChange: onLeftColWidthChange,
+    onCollapsedChange: (next) => {
+      if (next) onToggleLeftColCollapsed(true)
+      else onToggleLeftColCollapsed(false)
+    },
+  })
+
+  const todayPosition = useMemo(
+    () => getTodayTimelinePosition(weekCalendar, WEEK_WIDTH),
+    [],
+  )
+
+  const markerLayout = useMemo(
+    () => buildMarkerLayout(markers, WEEK_WIDTH),
+    [markers],
+  )
+
+  const syncHeaderScrollLeft = useCallback((scrollLeft) => {
+    if (headerScrollRef.current) {
+      headerScrollRef.current.scrollLeft = scrollLeft
+    }
+  }, [])
+
+  const applyScroll = useCallback((scrollLeft, scrollTop) => {
+    const grid = gridRef.current
+    const leftBody = leftBodyRef.current
+    if (!grid) return
+
+    suppressScrollTrackingRef.current = true
+    grid.scrollLeft = scrollLeft
+    grid.scrollTop = scrollTop
+    syncHeaderScrollLeft(scrollLeft)
+    if (leftBody) leftBody.scrollTop = scrollTop
+    scrollPositionRef.current = { scrollLeft, scrollTop }
+
+    requestAnimationFrame(() => {
+      suppressScrollTrackingRef.current = false
+    })
+  }, [gridRef, syncHeaderScrollLeft])
+
+  const scrollToDatePosition = useCallback(
+    (isoDate) => {
+      const grid = gridRef.current
+      if (!grid || !isoDate) return
+      const pos = getDateTimelinePosition(weekCalendar, WEEK_WIDTH, isoDate)
+      if (pos == null) return
+      applyScroll(Math.max(0, pos - grid.clientWidth / 2), grid.scrollTop)
+      shouldPersistViewRef.current = true
+    },
+    [applyScroll, gridRef],
   )
 
   useEffect(() => {
-    const el = gridRef.current
-    if (!el) return
-    el.scrollLeft = CURRENT_PI_START_WEEK * WEEK_WIDTH
-  }, [gridRef])
+    scrollInitializedRef.current = false
+    shouldPersistViewRef.current = false
+    scrollPositionRef.current = { scrollLeft: 0, scrollTop: 0 }
+  }, [projectId])
 
-  const contentWidth = LEFT_COL_WIDTH + TOTAL_WEEKS * WEEK_WIDTH
+  useEffect(() => {
+    const grid = gridRef.current
+    if (!grid || scrollInitializedRef.current) return
+
+    const saved = loadTimelineView(projectId)
+    if (saved) {
+      shouldPersistViewRef.current = true
+      applyScroll(saved.scrollLeft, saved.scrollTop)
+    } else {
+      const fallback = CURRENT_PI_START_WEEK * WEEK_WIDTH
+      const scrollLeft = scrollLeftForToday(
+        weekCalendar,
+        WEEK_WIDTH,
+        grid.clientWidth,
+        fallback,
+      )
+      applyScroll(scrollLeft, 0)
+    }
+
+    scrollInitializedRef.current = true
+  }, [projectId, applyScroll, gridRef])
+
+  useEffect(() => {
+    if (!scrollToDate) return
+    scrollToDatePosition(scrollToDate)
+    onScrollToDateHandled?.()
+  }, [scrollToDate, scrollToDatePosition, onScrollToDateHandled])
+
+  useEffect(() => {
+    return () => {
+      if (!shouldPersistViewRef.current) return
+      saveTimelineView(projectId, scrollPositionRef.current)
+    }
+  }, [projectId])
+
+  const syncScrollTop = useCallback((source, target) => {
+    if (!source || !target || scrollSyncRef.current) return
+    scrollSyncRef.current = true
+    target.scrollTop = source.scrollTop
+    scrollSyncRef.current = false
+  }, [])
+
+  const handleLeftScroll = useCallback(() => {
+    syncScrollTop(leftBodyRef.current, gridRef.current)
+  }, [gridRef, syncScrollTop])
+
+  const handleRightScroll = useCallback(() => {
+    const grid = gridRef.current
+    if (grid) {
+      scrollPositionRef.current = {
+        scrollLeft: grid.scrollLeft,
+        scrollTop: grid.scrollTop,
+      }
+      syncHeaderScrollLeft(grid.scrollLeft)
+    }
+
+    if (!suppressScrollTrackingRef.current) {
+      shouldPersistViewRef.current = true
+    }
+
+    syncScrollTop(gridRef.current, leftBodyRef.current)
+  }, [gridRef, syncScrollTop, syncHeaderScrollLeft])
+
+  const handleBackgroundPointerDown = useCallback(
+    (e) => {
+      if (drag) return
+      if (e.target.closest('[data-feature-interactive]')) return
+      if (e.target.closest('[role="separator"]')) return
+      if (selectedFeatureId) onDeselectFeature?.()
+    },
+    [drag, selectedFeatureId, onDeselectFeature],
+  )
+
+  const showFullNames = !leftColCollapsed && leftColWidth >= 340
+  const timelineWidth = TOTAL_WEEKS * WEEK_WIDTH
+  const bodyMinHeight = timelineRows.reduce((sum, row) => sum + rowHeight(row), 0)
 
   return (
-    <>
-      <div ref={gridRef} className="relative min-h-0 flex-1 overflow-auto bg-white">
-        <div style={{ width: contentWidth, minHeight: features.length * ROW_HEIGHT }}>
-          <TimelineHeader />
+    <div data-timeline-split className="relative flex min-h-0 flex-1 flex-col">
+      {/* Shared header row — Features + Timeline header aligned */}
+      <div className="flex shrink-0 items-stretch">
+        <div style={{ width: effectiveColWidth }}>
+          <FeaturePanelHeader
+            collapsed={leftColCollapsed}
+            onToggle={() => onToggleLeftColCollapsed()}
+          />
+        </div>
+        <div
+          ref={headerScrollRef}
+          className="min-w-0 flex-1 overflow-hidden"
+          aria-hidden
+        >
+          <TimelineHeader todayPosition={todayPosition} markerItems={markerLayout} />
+        </div>
+      </div>
 
-          <div className="relative">
-            <WeekHighlight
-              drag={drag}
-              barWidth={barWidth}
-              barLeft={barLeft}
-              leftColWidth={LEFT_COL_WIDTH}
-              rowHeight={ROW_HEIGHT}
-              barHeight={BAR_HEIGHT}
-            />
+      {/* Body row — vertically synced scroll areas */}
+      <div className="flex min-h-0 flex-1">
+        <div
+          data-feature-panel
+          className="relative flex shrink-0 flex-col bg-white"
+          style={{ width: effectiveColWidth }}
+          onPointerDown={handleBackgroundPointerDown}
+        >
+          <div
+            ref={leftBodyRef}
+            className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+            onScroll={handleLeftScroll}
+          >
+            <div style={{ minHeight: bodyMinHeight }}>
+              {timelineRows.map((row) => {
+                if (row.type === 'section') {
+                  if (leftColCollapsed) {
+                    return (
+                      <div
+                        key={row.id}
+                        className="border-b border-r border-gray-200 bg-gray-50"
+                        style={{ height: SECTION_ROW_HEIGHT }}
+                      />
+                    )
+                  }
+                  return (
+                    <TeamSectionHeader
+                      key={row.id}
+                      label={row.label}
+                      count={row.count}
+                      alert={row.alert}
+                    />
+                  )
+                }
 
-            {features.map((feature) => (
-              <FeatureRow
-                key={feature.id}
-                feature={feature}
-                isDragging={drag?.featureId === feature.id}
-                dragMode={drag?.mode}
-                onBarPointerDown={(e) => beginDrag(e, feature.id, 'bar')}
-                onRowPointerDown={(e) => beginDrag(e, feature.id, 'row')}
+                const feature = row.feature
+                return (
+                  <FeatureLabelRow
+                    key={feature.id}
+                    feature={feature}
+                    collapsed={leftColCollapsed}
+                    showFullName={showFullNames}
+                    isSelected={selectedFeatureId === feature.id}
+                    isDragging={drag?.featureId === feature.id}
+                    onRowPointerDown={(e) => beginDrag(e, feature.id, 'row')}
+                    onSelect={() => onSelectFeature(feature.id)}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div
+          ref={gridRef}
+          data-timeline-grid
+          className="min-w-0 flex-1 overflow-auto bg-white"
+          onScroll={handleRightScroll}
+          onPointerDown={handleBackgroundPointerDown}
+        >
+          <div className="relative" style={{ width: timelineWidth, minHeight: bodyMinHeight }}>
+            {todayPosition != null && <TodayBodyLine left={todayPosition} />}
+            {markerLayout.map((item) => (
+              <TimelineMarkerBodyLine
+                key={item.marker.id}
+                marker={item.marker}
+                left={item.left}
               />
             ))}
+
+            <div ref={rowsRef} className="relative">
+              {timelineRows.map((row) => {
+                if (row.type === 'section') {
+                  return (
+                    <div
+                      key={row.id}
+                      className="border-b border-gray-200 bg-gray-50"
+                      style={{ height: SECTION_ROW_HEIGHT }}
+                    />
+                  )
+                }
+
+                const feature = row.feature
+                return (
+                  <FeatureBarRow
+                    key={feature.id}
+                    feature={feature}
+                    isSelected={selectedFeatureId === feature.id}
+                    isDragging={drag?.featureId === feature.id}
+                    dragStyle={drag?.featureId === feature.id ? drag.barStyle : null}
+                    onBarPointerDown={(e) => beginDrag(e, feature.id, 'bar', e.currentTarget)}
+                    onSelect={() => onSelectFeature(feature.id)}
+                  />
+                )
+              })}
+
+              {timelineRows.filter((r) => r.type === 'feature').length === 0 && (
+                <div className="flex items-center justify-center py-16 text-sm text-gray-400">
+                  No features yet. Use &quot;Add Feature&quot; to get started.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      <DragGhost drag={drag} />
-    </>
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize feature panel"
+        onPointerDown={startResize}
+        className="absolute bottom-0 top-0 z-30 w-2 -translate-x-1/2 cursor-col-resize hover:bg-violet-400/40 active:bg-violet-500/50"
+        style={{ left: effectiveColWidth }}
+      />
+    </div>
   )
 }

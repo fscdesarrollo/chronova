@@ -1,8 +1,9 @@
-import { AlertTriangle, GripVertical, MoveHorizontal } from 'lucide-react'
+import { GripVertical, MoveHorizontal } from 'lucide-react'
 
 export default function Footer({ features }) {
-  const totalSPs = features.reduce((sum, f) => sum + f.storyPoints, 0)
-  const movedCount = features.filter((f) => f.moved || f.deviation != null).length
+  const totalSPs = features.reduce((sum, f) => sum + (f.storyPoints || 0), 0)
+  const completedCount = features.filter((f) => f.completed).length
+  const crossPiCount = features.filter((f) => f.crossPi).length
 
   return (
     <footer className="flex shrink-0 items-center justify-between border-t border-gray-200 bg-white px-6 py-3 text-sm text-gray-600">
@@ -12,13 +13,20 @@ export default function Footer({ features }) {
         </span>
         <span className="text-gray-300">|</span>
         <span>
-          <strong className="font-semibold text-gray-900">{totalSPs}</strong> SPs total
+          <strong className="font-semibold text-gray-900">{totalSPs}</strong> SP total
         </span>
         <span className="text-gray-300">|</span>
-        <span className="flex items-center gap-1 text-orange-600">
-          <AlertTriangle size={14} />
-          <strong className="font-semibold">{movedCount}</strong> moved
+        <span>
+          <strong className="font-semibold text-gray-900">{completedCount}</strong> delivered
         </span>
+        {crossPiCount > 0 && (
+          <>
+            <span className="text-gray-300">|</span>
+            <span>
+              <strong className="font-semibold text-amber-600">{crossPiCount}</strong> cross-PI
+            </span>
+          </>
+        )}
       </div>
 
       <div className="flex items-center gap-3 text-gray-400">
