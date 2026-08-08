@@ -157,6 +157,8 @@ export function useFeatureDrag(timelineRows, onMove, leftColWidth = LEFT_COL_WID
       if (!featureRow) return
 
       const feature = featureRow.feature
+      if (mode === 'bar' && !feature.onGantt) return
+
       const visualRowIndex = timelineRows.findIndex(
         (r) => r.type === 'feature' && r.feature.id === featureId,
       )

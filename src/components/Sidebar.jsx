@@ -24,10 +24,9 @@ export default function Sidebar({
   projectId,
   onProjectChange,
   teamsForProject,
-  teamViewMode,
-  onTeamViewModeChange,
+  viewMode,
   filterTeamId,
-  onFilterTeamChange,
+  onViewChange,
   actor,
   onActorChange,
 }) {
@@ -101,23 +100,24 @@ export default function Sidebar({
             </select>
 
             <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-              Team view
+              View
             </label>
             <select
-              value={teamViewMode === 'all' ? 'all' : filterTeamId ?? ''}
+              value={viewMode === 'all' ? 'all' : viewMode === 'backlog' ? 'backlog' : filterTeamId ?? ''}
               onChange={(e) => {
                 const val = e.target.value
                 if (val === 'all') {
-                  onTeamViewModeChange('all')
-                  onFilterTeamChange(null)
+                  onViewChange('all')
+                } else if (val === 'backlog') {
+                  onViewChange('backlog')
                 } else {
-                  onTeamViewModeChange('single')
-                  onFilterTeamChange(val)
+                  onViewChange('team', val)
                 }
               }}
               className="mb-2 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white focus:border-violet-400 focus:outline-none"
             >
-              <option value="all" className="text-gray-900">All teams</option>
+              <option value="all" className="text-gray-900">All</option>
+              <option value="backlog" className="text-gray-900">Backlog</option>
               {teamsForProject.map((t) => (
                 <option key={t.id} value={t.id} className="text-gray-900">
                   {t.name}

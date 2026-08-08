@@ -9,7 +9,7 @@ export default function Footer({ features }) {
     <footer className="flex shrink-0 items-center justify-between border-t border-gray-200 bg-white px-6 py-3 text-sm text-gray-600">
       <div className="flex items-center gap-4">
         <span>
-          <strong className="font-semibold text-gray-900">{features.length}</strong> features
+          <strong className="font-semibold text-gray-900">{features.length}</strong> on Gantt
         </span>
         <span className="text-gray-300">|</span>
         <span>

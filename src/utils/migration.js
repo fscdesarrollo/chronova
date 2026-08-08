@@ -7,7 +7,35 @@ import {
   seedProjects,
   seedTeams,
 } from '../data'
+import { defaultFormattingRulesForProject, normalizeFormattingRules } from './formattingRules'
 import { resetIdCounters, resetMarkerCounter } from './ids'
+
+export function isPlannedFeature(feature) {
+  return feature.planningStatus === 'planned'
+}
+
+export function isOnGantt(feature) {
+  return (
+    isPlannedFeature(feature) &&
+    Boolean(feature.startDate) &&
+    Boolean(feature.targetDate)
+  )
+}
+
+export function derivePlanningStatus(feature) {
+  if (feature.planningStatus) return feature.planningStatus
+  return feature.teamId ? 'planned' : 'backlog'
+}
+
+export function migrateViewMode(saved) {
+  if (saved.viewMode) {
+    return { viewMode: saved.viewMode, filterTeamId: saved.filterTeamId ?? null }
+  }
+  if (saved.teamViewMode === 'single' && saved.filterTeamId) {
+    return { viewMode: 'team', filterTeamId: saved.filterTeamId }
+  }
+  return { viewMode: 'all', filterTeamId: null }
+}
 
 export function migrateState(saved) {
   if (!saved) {
@@ -17,22 +45,34 @@ export function migrateState(saved) {
   if (saved.projects?.length) {
     const { products, projectProducts } = migrateProductsToJunction(saved)
     resetIdCounters({ ...saved, products })
+    const projects = saved.projects
+    const formattingRules = migrateFormattingRules(saved.formattingRules, projects)
+    const { viewMode, filterTeamId } = migrateViewMode(saved)
     return {
-      projects: saved.projects,
+      projects,
       teams: saved.teams ?? seedTeams,
       projectTeams: saved.projectTeams ?? seedProjectTeams,
       products,
       projectProducts,
       features: (saved.features ?? []).map(normalizeFeature),
       timelineMarkers: saved.timelineMarkers ?? [],
+      formattingRules,
       auditEvents: saved.auditEvents ?? [],
       projectId: saved.projectId ?? saved.projects[0]?.id ?? DEFAULT_PROJECT_ID,
-      teamViewMode: saved.teamViewMode ?? 'all',
-      filterTeamId: saved.filterTeamId ?? null,
+      viewMode,
+      filterTeamId,
+      collapsedSections: saved.collapsedSections ?? {},
     }
   }
 
   return migrateLegacyState(saved)
+}
+
+function migrateFormattingRules(savedRules, projects) {
+  if (!savedRules?.length) {
+    return projects.flatMap((p) => defaultFormattingRulesForProject(p.id))
+  }
+  return normalizeFormattingRules(savedRules)
 }
 
 function migrateProductsToJunction(saved) {
@@ -72,10 +112,12 @@ function buildFreshState() {
     projectProducts: seedProjectProducts,
     features,
     timelineMarkers: [],
+    formattingRules: seedProjects.flatMap((p) => defaultFormattingRulesForProject(p.id)),
     auditEvents: [],
     projectId: DEFAULT_PROJECT_ID,
-    teamViewMode: 'all',
+    viewMode: 'all',
     filterTeamId: null,
+    collapsedSections: {},
   }
 }
 
@@ -94,10 +136,12 @@ function migrateLegacyState(saved) {
     projectProducts: seedProjectProducts,
     features,
     timelineMarkers: saved.timelineMarkers ?? [],
+    formattingRules: seedProjects.flatMap((p) => defaultFormattingRulesForProject(p.id)),
     auditEvents: saved.auditEvents ?? [],
     projectId: DEFAULT_PROJECT_ID,
-    teamViewMode: 'all',
+    viewMode: 'all',
     filterTeamId: null,
+    collapsedSections: {},
   }
 
   resetIdCounters(state)
@@ -114,11 +158,20 @@ function normalizeProduct(p) {
 }
 
 function normalizeFeature(f) {
+  const planningStatus = derivePlanningStatus(f)
+  const teamId = planningStatus === 'backlog' ? null : (f.teamId ?? null)
   return {
     ...f,
     projectId: f.projectId ?? DEFAULT_PROJECT_ID,
+    planningStatus,
+    teamId,
     assignmentStatus: f.assignmentStatus ?? 'ok',
     userStories: f.userStories ?? [],
+    notes: f.notes ?? '',
+    comments: f.comments ?? [],
+    dependsOn: Array.isArray(f.dependsOn) ? f.dependsOn : [],
+    startDate: f.startDate ?? null,
+    targetDate: f.targetDate ?? null,
   }
 }
 
@@ -133,7 +186,8 @@ function legacyColorToHex(tailwindClass) {
 }
 
 export function computeFeatureAssignmentStatus(feature, projectTeams) {
-  if (!feature.projectId || !feature.teamId) return 'team_unassigned'
+  if (!feature.teamId) return 'ok'
+  if (!feature.projectId) return 'team_unassigned'
   const assigned = projectTeams.some(
     (pt) => pt.projectId === feature.projectId && pt.teamId === feature.teamId,
   )

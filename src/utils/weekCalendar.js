@@ -1,16 +1,19 @@
 import { parseDisplayDate, toISODate } from './dates'
 
-function sprintType(sprintId, weekIndex, totalWeeks) {
-  if (!sprintId.includes('.4')) return 'development'
+function isInnovationSprint(sprintId) {
+  return sprintId.endsWith('.IP')
+}
+
+function weekSprintType(sprintId, weekIndex, totalWeeks) {
+  if (!isInnovationSprint(sprintId)) return 'development'
   return weekIndex === totalWeeks - 1 ? 'planning' : 'innovation'
 }
 
-function sprintBg(type) {
-  switch (type) {
-    case 'innovation': return 'bg-sprint-innovation'
-    case 'planning': return 'bg-sprint-planning'
-    default: return 'bg-sprint-dev'
+function weekSprintBg(sprint, weekIndex, totalWeeks) {
+  if (isInnovationSprint(sprint.id)) {
+    return weekIndex === totalWeeks - 1 ? 'bg-sprint-planning' : (sprint.bg ?? 'bg-sprint-innovation')
   }
+  return sprint.bg ?? 'bg-sprint-dev'
 }
 
 export function buildWeekCalendar(programIncrements) {
@@ -24,14 +27,11 @@ export function buildWeekCalendar(programIncrements) {
     let piWeekCount = 0
 
     for (const sprint of pi.sprints) {
-      const isIp = sprint.id.includes('.4')
       sprint.weeks.forEach((week, i) => {
         const startDate = parseDisplayDate(week.date, yearRef)
         const endDate = new Date(startDate)
         endDate.setDate(endDate.getDate() + 6)
-        const type = isIp
-          ? (i === sprint.weeks.length - 1 ? 'planning' : 'innovation')
-          : 'development'
+        const type = weekSprintType(sprint.id, i, sprint.weeks.length)
 
         weeks.push({
           index: weekIndex,
@@ -44,7 +44,7 @@ export function buildWeekCalendar(programIncrements) {
           sprintId: sprint.id,
           sprintName: sprint.name,
           sprintType: type,
-          sprintBg: sprintBg(type),
+          sprintBg: weekSprintBg(sprint, i, sprint.weeks.length),
           weekInSprint: i + 1,
         })
         weekIndex++

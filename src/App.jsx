@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import Sidebar from './components/Sidebar'
 import TopNav from './components/TopNav'
 import TimelineGrid from './components/TimelineGrid'
@@ -17,6 +17,32 @@ export default function App() {
   const [viewMode, setViewMode] = useState('current')
   const [currentPage, setCurrentPage] = useState('timeline')
   const timeline = useTimelineState()
+  const detailPanelRef = useRef(null)
+
+  const requestProtectedAction = (action) => {
+    if (currentPage === 'timeline' && timeline.selectedFeatureId && detailPanelRef.current) {
+      detailPanelRef.current.requestLeave(action)
+      return
+    }
+    action()
+  }
+
+  const requestSelectFeature = (id) => {
+    if (id === timeline.selectedFeatureId) return
+    requestProtectedAction(() => timeline.setSelectedFeatureId(id))
+  }
+
+  const requestDeselectFeature = () => {
+    requestProtectedAction(() => timeline.setSelectedFeatureId(null))
+  }
+
+  const handleNavigate = (page) => {
+    requestProtectedAction(() => setCurrentPage(page))
+  }
+
+  const handleProjectChange = (projectId) => {
+    requestProtectedAction(() => timeline.setProjectId(projectId))
+  }
 
   const defaultDates = useMemo(() => timeline.getDefaultFeatureDates(), [timeline])
   const history = timeline.selectedFeature
@@ -84,7 +110,9 @@ export default function App() {
               <TimelineGrid
                 projectId={timeline.projectId}
                 timelineRows={timeline.timelineRows}
+                allFeatures={timeline.allFeatures}
                 markers={timeline.markersForProject}
+                formattingRules={timeline.formattingRulesForProject}
                 scrollToDate={timeline.scrollToDate}
                 onScrollToDateHandled={timeline.clearScrollToDate}
                 leftColWidth={leftColWidth}
@@ -99,25 +127,35 @@ export default function App() {
                     timeline.setLayout({ leftColCollapsed: !timeline.layout.leftColCollapsed })
                   }
                 }}
+                onToggleSectionCollapsed={timeline.toggleSectionCollapsed}
+                onCollapseAllSections={timeline.collapseAllSections}
+                onExpandAllSections={timeline.expandAllSections}
                 onMove={timeline.moveFeature}
                 selectedFeatureId={timeline.selectedFeatureId}
-                onSelectFeature={timeline.setSelectedFeatureId}
-                onDeselectFeature={() => timeline.setSelectedFeatureId(null)}
+                onSelectFeature={requestSelectFeature}
+                onDeselectFeature={requestDeselectFeature}
               />
-              <Footer features={timeline.features} />
+              <Footer features={timeline.ganttFeatures} />
             </div>
 
             {timeline.selectedFeature && (
               <FeatureDetailPanel
+                ref={detailPanelRef}
                 feature={timeline.selectedFeature}
                 history={history}
                 teamsForProject={timeline.teamsForProject}
                 allTeams={timeline.teams}
-                onClose={() => timeline.setSelectedFeatureId(null)}
+                allFeatures={timeline.allFeatures}
+                actor={timeline.actor}
+                onClose={requestDeselectFeature}
                 onUpdate={timeline.updateFeature}
                 onDelete={timeline.deleteFeature}
                 onAddUserStory={timeline.addUserStory}
                 onRemoveUserStory={timeline.removeUserStory}
+                onAddComment={timeline.addComment}
+                onUpdateComment={timeline.updateComment}
+                onDeleteComment={timeline.deleteComment}
+                onEditPreviewChange={timeline.setFeatureEditPreview}
               />
             )}
           </>
@@ -135,15 +173,14 @@ export default function App() {
           timeline.setLayout({ sidebarCollapsed: !timeline.layout.sidebarCollapsed })
         }
         currentPage={currentPage}
-        onNavigate={setCurrentPage}
+        onNavigate={handleNavigate}
         projects={timeline.projects}
         projectId={timeline.projectId}
-        onProjectChange={timeline.setProjectId}
+        onProjectChange={handleProjectChange}
         teamsForProject={timeline.teamsForProject}
-        teamViewMode={timeline.teamViewMode}
-        onTeamViewModeChange={timeline.setTeamViewMode}
+        viewMode={timeline.viewMode}
         filterTeamId={timeline.filterTeamId}
-        onFilterTeamChange={timeline.setFilterTeamId}
+        onViewChange={timeline.setViewFilter}
         actor={timeline.actor}
         onActorChange={timeline.setActor}
       />
@@ -154,8 +191,8 @@ export default function App() {
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           projectName={timeline.activeProject?.name}
-          onAddFeature={() => timeline.setShowAddModal(true)}
-          onOpenGanttSettings={() => timeline.setShowGanttSettings(true)}
+          onAddFeature={() => requestProtectedAction(() => timeline.setShowAddModal(true))}
+          onOpenGanttSettings={() => requestProtectedAction(() => timeline.setShowGanttSettings(true))}
           showAddFeature={currentPage === 'timeline'}
         />
 
@@ -174,17 +211,20 @@ export default function App() {
       <GanttSettingsModal
         open={timeline.showGanttSettings}
         markers={timeline.markersForProject}
+        formattingRules={timeline.formattingRulesForProject}
         onClose={() => timeline.setShowGanttSettings(false)}
-        onSave={(validMarkers) => {
+        onSaveMarkers={(validMarkers) => {
           const prevKeys = new Set(
             timeline.markersForProject.map((m) => `${m.date}|${m.label}`),
           )
           const added = validMarkers.filter((m) => !prevKeys.has(`${m.date}|${m.label}`))
           timeline.saveProjectMarkers(validMarkers)
-          timeline.setShowGanttSettings(false)
           if (added.length > 0) {
             timeline.requestScrollToDate(added[added.length - 1].date)
           }
+        }}
+        onSaveFormattingRules={(rules) => {
+          timeline.saveFormattingRules(rules)
         }}
       />
     </div>

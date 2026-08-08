@@ -1,20 +1,25 @@
 import { programIncrements, sprints, TOTAL_WEEKS, weekCalendar } from '../data'
 import { WEEK_WIDTH } from '../constants'
-import { TodayHeaderMarker, TimelineMarkerHeader } from './TimelineMarkers'
+import { TodayHeaderMarker, GroupedMarkerHeader } from './TimelineMarkers'
 
-export default function TimelineHeader({ todayPosition, markerItems = [] }) {
+export default function TimelineHeader({
+  todayPosition,
+  markerGroups = [],
+  expandedMarkerDates = new Set(),
+  onToggleMarkerGroup,
+}) {
   const timelineWidth = TOTAL_WEEKS * WEEK_WIDTH
 
   return (
     <div className="bg-header text-white" style={{ width: timelineWidth }}>
       <div className="relative min-h-[26px]">
         {todayPosition != null && <TodayHeaderMarker left={todayPosition} />}
-        {markerItems.map((item) => (
-          <TimelineMarkerHeader
-            key={item.marker.id}
-            marker={item.marker}
-            left={item.left}
-            stackIndex={item.stackIndex}
+        {markerGroups.map((group) => (
+          <GroupedMarkerHeader
+            key={group.date}
+            group={group}
+            expanded={expandedMarkerDates.has(group.date)}
+            onToggle={() => onToggleMarkerGroup?.(group.date)}
           />
         ))}
       </div>
@@ -48,24 +53,16 @@ export default function TimelineHeader({ todayPosition, markerItems = [] }) {
                 <div className="text-[10px] text-gray-300">{sprint.range}</div>
               </div>
               <div className="flex">
-                {sprint.weeks.map((week, i) => {
-                  const cal = sprintWeeks[i]
-                  const isPlanning = cal?.sprintType === 'planning'
-                  return (
-                    <div
-                      key={i}
-                      className={`border-r border-white/5 px-1 py-1.5 text-center last:border-r-0 ${
-                        isPlanning ? 'bg-sprint-planning' : cal?.sprintBg ?? ''
-                      }`}
-                      style={{ width: WEEK_WIDTH }}
-                    >
-                      <div className="text-[10px] font-medium">
-                        {isPlanning ? 'Planning' : week.label}
-                      </div>
-                      <div className="text-[9px] text-gray-400">{week.date}</div>
-                    </div>
-                  )
-                })}
+                {sprintWeeks.map((week) => (
+                  <div
+                    key={week.index}
+                    className={`border-r border-white/10 px-1 py-1 text-center ${week.sprintBg}`}
+                    style={{ width: WEEK_WIDTH }}
+                  >
+                    <div className="text-[10px] font-medium">{week.label}</div>
+                    <div className="text-[9px] text-gray-400">{week.displayDate}</div>
+                  </div>
+                ))}
               </div>
             </div>
           )
