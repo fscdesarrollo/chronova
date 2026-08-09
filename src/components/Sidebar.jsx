@@ -77,7 +77,7 @@ export default function Sidebar({
         </button>
       </div>
 
-      <nav className="border-b border-white/10 p-2">
+      <nav className="border-b border-white/10 p-2" data-tour="sidebar-nav">
         {NAV_GROUPS.map((group, groupIndex) => (
           <div key={groupIndex}>
             {groupIndex > 0 && (
@@ -153,7 +153,7 @@ export default function Sidebar({
         )}
       </div>
 
-      <div className="border-t border-white/10 p-3">
+      <div className="border-t border-white/10 p-3" data-tour="sidebar-user">
         {!collapsed ? (
           <>
             <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">

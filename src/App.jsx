@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Sidebar from './components/Sidebar'
 import TopNav from './components/TopNav'
 import TimelineGrid from './components/TimelineGrid'
@@ -6,19 +6,70 @@ import Footer from './components/Footer'
 import AddFeatureModal from './components/AddFeatureModal'
 import GanttSettingsModal from './components/GanttSettingsModal'
 import FeatureDetailPanel from './components/FeatureDetailPanel'
-import ActorSetup from './components/ActorSetup'
 import ProjectsPage from './components/pages/ProjectsPage'
 import TeamsPage from './components/pages/TeamsPage'
 import ProductsPage from './components/pages/ProductsPage'
 import IterationsPage from './components/pages/IterationsPage'
 import HomePage from './components/pages/HomePage'
+import SetupWizard from './components/onboarding/SetupWizard'
+import GanttSetupChecklist from './components/onboarding/GanttSetupChecklist'
+import TourRunner from './components/onboarding/TourRunner'
 import { PAGE_TITLES } from './brand'
 import { useTimelineState } from './hooks/useTimelineState'
+import {
+  dismissSetupChecklist,
+  loadOnboarding,
+  markTourCompleted,
+  markWizardCompleted,
+} from './utils/onboarding'
+import { getInitialPage, loadNavigation, saveNavigation } from './utils/navigation'
+
+function PageShell({ children }) {
+  return (
+    <div data-tour="page-main" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      {children}
+    </div>
+  )
+}
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState('home')
+  const [currentPage, setCurrentPage] = useState(getInitialPage)
+  const [onboarding, setOnboarding] = useState(loadOnboarding)
+  const [showWizard, setShowWizard] = useState(false)
+  const [activeTourId, setActiveTourId] = useState(null)
+  const [navMemory, setNavMemory] = useState(loadNavigation)
   const timeline = useTimelineState()
   const detailPanelRef = useRef(null)
+
+  const readiness = timeline.ganttReadiness
+
+  const showChecklist =
+    currentPage === 'timeline' &&
+    !onboarding.checklistDismissed &&
+    !readiness.isComplete
+
+  useEffect(() => {
+    if (readiness.isComplete && !onboarding.wizardCompleted) {
+      markWizardCompleted()
+      setOnboarding(loadOnboarding())
+    }
+  }, [readiness.isComplete, onboarding.wizardCompleted])
+
+  const navigateToPage = (page) => {
+    setCurrentPage(page)
+    saveNavigation(page)
+    setNavMemory(loadNavigation())
+  }
+
+  const navigateTo = (page) => {
+    requestProtectedAction(() => navigateToPage(page))
+  }
+
+  const handleOpenFromHome = () => {
+    const nav = loadNavigation()
+    const target = nav.hasVisited && nav.lastPage !== 'home' ? nav.lastPage : 'timeline'
+    navigateTo(target)
+  }
 
   const requestProtectedAction = (action) => {
     if (currentPage === 'timeline' && timeline.selectedFeatureId && detailPanelRef.current) {
@@ -37,10 +88,6 @@ export default function App() {
     requestProtectedAction(() => timeline.setSelectedFeatureId(null))
   }
 
-  const handleNavigate = (page) => {
-    requestProtectedAction(() => setCurrentPage(page))
-  }
-
   const handleProjectChange = (projectId) => {
     requestProtectedAction(() => timeline.setProjectId(projectId))
   }
@@ -56,85 +103,164 @@ export default function App() {
     timeline.setLayout({ leftColWidth: width })
   }
 
+  const handleWizardComplete = (payload) => {
+    timeline.setActor(payload.userName)
+    const result = timeline.setupProjectForGantt({
+      projectName: payload.projectName,
+      teamName: payload.teamName,
+      featureName: payload.featureName,
+      calendarStartDate: payload.calendarStartDate,
+    })
+    markWizardCompleted()
+    setOnboarding(loadOnboarding())
+    setShowWizard(false)
+    navigateToPage('timeline')
+    if (result.feature?.id) {
+      timeline.setSelectedFeatureId(result.feature.id)
+      if (result.feature.startDate) {
+        timeline.requestScrollToDate(result.feature.startDate)
+      }
+    }
+  }
+
+  const handleWizardSkip = () => {
+    setShowWizard(false)
+  }
+
+  const handleStartTour = () => {
+    setActiveTourId('app-intro')
+  }
+
+  const handleTourClose = () => {
+    setActiveTourId(null)
+  }
+
+  const handleTourComplete = () => {
+    markTourCompleted()
+    setOnboarding(loadOnboarding())
+    setActiveTourId(null)
+  }
+
+  const handleAddFeature = () => {
+    if (!readiness.canAddFeature) {
+      setShowWizard(true)
+      return
+    }
+    requestProtectedAction(() => timeline.setShowAddModal(true))
+  }
+
   const renderMainContent = () => {
     switch (currentPage) {
       case 'home':
         return (
           <HomePage
             activeProject={timeline.projects.find((p) => p.id === timeline.projectId)}
-            onOpenTimeline={() => setCurrentPage('timeline')}
-            onConfigureProject={() => setCurrentPage('projects')}
+            ganttReady={readiness.isReady}
+            hasVisited={navMemory.hasVisited}
+            lastPage={navMemory.lastPage}
+            promoteTour={!onboarding.tourCompleted && !navMemory.hasVisited}
+            onOpenTimeline={handleOpenFromHome}
+            onStartTour={handleStartTour}
+            onStartSetup={() => setShowWizard(true)}
+            onConfigureProject={() => navigateTo('projects')}
           />
         )
       case 'projects':
         return (
-          <ProjectsPage
-            projects={timeline.projects}
-            teams={timeline.teams}
-            projectTeams={timeline.projectTeams}
-            iterationPlans={timeline.iterationPlans}
-            projectIterationPlans={timeline.projectIterationPlans}
-            features={timeline.allFeatures}
-            projectId={timeline.projectId}
-            onSelectProject={timeline.setProjectId}
-            onCreate={timeline.createProject}
-            onRename={timeline.renameProject}
-            onDelete={timeline.deleteProject}
-            onSetProjectTeams={timeline.setProjectTeamIds}
-            onSetProjectIterationPlan={timeline.setProjectIterationPlan}
-          />
+          <PageShell>
+            <ProjectsPage
+              projects={timeline.projects}
+              teams={timeline.teams}
+              projectTeams={timeline.projectTeams}
+              iterationPlans={timeline.iterationPlans}
+              projectIterationPlans={timeline.projectIterationPlans}
+              features={timeline.allFeatures}
+              projectId={timeline.projectId}
+              onSelectProject={timeline.setProjectId}
+              onCreate={timeline.createProject}
+              onRename={timeline.renameProject}
+              onDelete={timeline.deleteProject}
+              onSetProjectTeams={timeline.setProjectTeamIds}
+              onSetProjectIterationPlan={timeline.setProjectIterationPlan}
+            />
+          </PageShell>
         )
       case 'iterations':
         return (
-          <IterationsPage
-            iterationPlans={timeline.iterationPlans}
-            timeboxes={timeline.timeboxes}
-            sprints={timeline.planSprints}
-            projects={timeline.projects}
-            projectIterationPlans={timeline.projectIterationPlans}
-            onCreatePlan={timeline.createIterationPlan}
-            onRenamePlan={timeline.renameIterationPlan}
-            onDeletePlan={timeline.deleteIterationPlan}
-            onCreateTimebox={timeline.createTimebox}
-            onDeleteTimebox={timeline.deleteTimebox}
-            onUpdateSprint={timeline.updateSprint}
-          />
+          <PageShell>
+            <IterationsPage
+              iterationPlans={timeline.iterationPlans}
+              timeboxes={timeline.timeboxes}
+              sprints={timeline.planSprints}
+              projects={timeline.projects}
+              projectIterationPlans={timeline.projectIterationPlans}
+              onCreatePlan={timeline.createIterationPlan}
+              onRenamePlan={timeline.renameIterationPlan}
+              onDeletePlan={timeline.deleteIterationPlan}
+              onCreateTimebox={timeline.createTimebox}
+              onDeleteTimebox={timeline.deleteTimebox}
+              onUpdateSprint={timeline.updateSprint}
+            />
+          </PageShell>
         )
       case 'teams':
         return (
-          <TeamsPage
-            teams={timeline.teams}
-            projects={timeline.projects}
-            projectId={timeline.projectId}
-            projectTeams={timeline.projectTeams}
-            features={timeline.allFeatures}
-            onCreate={timeline.createTeam}
-            onRename={timeline.renameTeam}
-            onDelete={timeline.deleteTeam}
-            onAssign={timeline.assignTeamToProject}
-            onUnassign={timeline.unassignTeamFromProject}
-          />
+          <PageShell>
+            <TeamsPage
+              teams={timeline.teams}
+              projects={timeline.projects}
+              projectId={timeline.projectId}
+              projectTeams={timeline.projectTeams}
+              features={timeline.allFeatures}
+              onCreate={timeline.createTeam}
+              onRename={timeline.renameTeam}
+              onDelete={timeline.deleteTeam}
+              onAssign={timeline.assignTeamToProject}
+              onUnassign={timeline.unassignTeamFromProject}
+            />
+          </PageShell>
         )
       case 'products':
         return (
-          <ProductsPage
-            products={timeline.products}
-            projects={timeline.projects}
-            projectProducts={timeline.projectProducts}
-            projectId={timeline.projectId}
-            orphanedProducts={timeline.orphanedProducts}
-            features={timeline.allFeatures}
-            onCreate={timeline.createProduct}
-            onUpdate={timeline.updateProduct}
-            onDelete={timeline.deleteProduct}
-            onSetProductProjects={timeline.setProductProjectIds}
-          />
+          <PageShell>
+            <ProductsPage
+              products={timeline.products}
+              projects={timeline.projects}
+              projectProducts={timeline.projectProducts}
+              projectId={timeline.projectId}
+              orphanedProducts={timeline.orphanedProducts}
+              features={timeline.allFeatures}
+              onCreate={timeline.createProduct}
+              onUpdate={timeline.updateProduct}
+              onDelete={timeline.deleteProduct}
+              onSetProductProjects={timeline.setProductProjectIds}
+            />
+          </PageShell>
         )
       case 'timeline':
       default:
         return (
           <>
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <div
+              data-tour="timeline-main"
+              className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+            >
+              {showChecklist && (
+                <GanttSetupChecklist
+                  readiness={readiness}
+                  onDismiss={() => {
+                    dismissSetupChecklist()
+                    setOnboarding(loadOnboarding())
+                  }}
+                  onStartWizard={() => setShowWizard(true)}
+                  onNavigate={(page, options) => {
+                    navigateToPage(page)
+                    if (options?.addFeature && readiness.canAddFeature) {
+                      timeline.setShowAddModal(true)
+                    }
+                  }}
+                />
+              )}
               <TimelineGrid
                 projectId={timeline.projectId}
                 calendar={timeline.projectCalendar}
@@ -194,7 +320,22 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
-      <ActorSetup actor={timeline.actor} onSave={timeline.setActor} />
+      <TourRunner
+        tourId={activeTourId}
+        open={Boolean(activeTourId)}
+        currentPage={currentPage}
+        onNavigate={navigateToPage}
+        onClose={handleTourClose}
+        onComplete={handleTourComplete}
+        onRequestSetup={() => setShowWizard(true)}
+      />
+
+      <SetupWizard
+        open={showWizard}
+        initialUserName={timeline.actor}
+        onComplete={handleWizardComplete}
+        onSkip={handleWizardSkip}
+      />
 
       <Sidebar
         collapsed={timeline.layout.sidebarCollapsed}
@@ -202,7 +343,7 @@ export default function App() {
           timeline.setLayout({ sidebarCollapsed: !timeline.layout.sidebarCollapsed })
         }
         currentPage={currentPage}
-        onNavigate={handleNavigate}
+        onNavigate={navigateTo}
         projects={timeline.projects}
         projectId={timeline.projectId}
         onProjectChange={handleProjectChange}
@@ -220,9 +361,15 @@ export default function App() {
           planLabel={timeline.activePlan?.name}
           showPlanLabel={currentPage === 'timeline'}
           variant={currentPage === 'home' ? 'dark' : 'light'}
-          onAddFeature={() => requestProtectedAction(() => timeline.setShowAddModal(true))}
+          onAddFeature={handleAddFeature}
           onOpenGanttSettings={() => requestProtectedAction(() => timeline.setShowGanttSettings(true))}
           showAddFeature={currentPage === 'timeline'}
+          addFeatureDisabled={!readiness.canAddFeature}
+          addFeatureHint={
+            !readiness.canAddFeature
+              ? 'Add a product to this project before creating features.'
+              : undefined
+          }
         />
 
         <div className="flex min-h-0 flex-1 overflow-hidden">{renderMainContent()}</div>
@@ -235,6 +382,7 @@ export default function App() {
         teams={timeline.teamsForProject}
         products={timeline.productsForProject}
         defaultDates={defaultDates}
+        canPlanOnGantt={readiness.canAddPlannedFeature}
       />
 
       <GanttSettingsModal

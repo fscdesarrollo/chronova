@@ -8,6 +8,8 @@ export default function TopNav({
   showAddFeature = true,
   showPlanLabel = false,
   variant = 'light',
+  addFeatureDisabled = false,
+  addFeatureHint,
 }) {
   const isDark = variant === 'dark'
 
@@ -44,7 +46,12 @@ export default function TopNav({
             <button
               type="button"
               onClick={onAddFeature}
-              className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-violet-700"
+              title={addFeatureHint}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors ${
+                addFeatureDisabled
+                  ? 'cursor-not-allowed bg-violet-400 opacity-80'
+                  : 'bg-violet-600 hover:bg-violet-700'
+              }`}
             >
               <Plus size={16} />
               Add Feature

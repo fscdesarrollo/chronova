@@ -36,7 +36,7 @@ In real planning, almost everything eventually shows up in time:
 
 Chronova is an **adaptive planning timeline**: a simple PI view for teams and stakeholders, focused on executive clarity and early action — not a replacement for Jira or Azure DevOps.
 
-The **Home** screen introduces the brand (hero, pillars, name meaning) and routes users to the Timeline or project setup.
+The **Home** screen introduces the brand (hero, animated wordmark, pillars, name meaning) and routes users to the **product tour**, **setup wizard**, or **Timeline**. Home remains the brand landing for new and returning users (accessible anytime from the sidebar).
 
 | Principle | In the app |
 |-----------|------------|

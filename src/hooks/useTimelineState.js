@@ -12,7 +12,7 @@ import {
   seedTimeboxes,
 } from '../data'
 import { normalizeHex } from '../utils/colors'
-import { addDays } from '../utils/dates'
+import { addDays, addWeeks, suggestCalendarStartDate } from '../utils/dates'
 import { buildTimelineRows, allSectionIdsInRows } from '../utils/featureGroups'
 import {
   getNextFeatureId,
@@ -42,6 +42,7 @@ import {
 } from '../utils/migration'
 import { defaultFormattingRulesForProject } from '../utils/formattingRules'
 import { hasDependencyCycle, normalizeDependsOn, sameFeatureId } from '../utils/dependencies'
+import { getProjectGanttReadiness } from '../utils/ganttReadiness'
 import { loadActor, loadLayout, loadState, saveActor, saveLayout, saveState } from '../utils/storage'
 import { featureBarPixels, isCrossPi } from '../utils/weekCalendar'
 import {
@@ -858,6 +859,147 @@ export function useTimelineState() {
     [actor, addAuditEvent, iterationPlans],
   )
 
+  const setupProjectForGantt = useCallback(
+    ({
+      projectName,
+      teamName,
+      productName = 'General',
+      productColor = '#8B5CF6',
+      featureName,
+      calendarStartDate = suggestCalendarStartDate(),
+    }) => {
+      const now = new Date().toISOString()
+      const newProjectId = nextProjectId()
+      const newTeamId = nextTeamId()
+      const newProductId = nextProductId()
+
+      let resolvedPlanId = iterationPlans[0]?.id ?? null
+      const nextPlans = [...iterationPlans]
+      const nextTimeboxes = [...timeboxes]
+      const nextSprints = [...planSprints]
+
+      if (!resolvedPlanId) {
+        resolvedPlanId = nextPlanId()
+        nextPlans.push({
+          id: resolvedPlanId,
+          name: 'SAFe Standard',
+          methodology: 'safe',
+          createdAt: now,
+        })
+      }
+
+      const planTimeboxes = nextTimeboxes.filter((t) => t.planId === resolvedPlanId)
+      if (!planTimeboxes.length) {
+        const timeboxId = nextTimeboxId()
+        const sprintList = buildSafeSprints(timeboxId, 'PI 1', calendarStartDate, () => nextSprintId())
+        const { endDate } = deriveTimeboxDates(sprintList)
+        nextTimeboxes.push({
+          id: timeboxId,
+          planId: resolvedPlanId,
+          name: 'PI 1',
+          startDate: calendarStartDate,
+          endDate,
+          sortOrder: 0,
+        })
+        nextSprints.push(...sprintList)
+      }
+
+      const defaultDates = getDefaultFeatureDatesFromPlan(
+        nextTimeboxes.filter((t) => t.planId === resolvedPlanId),
+      )
+
+      const project = { id: newProjectId, name: projectName.trim(), createdAt: now }
+      const team = { id: newTeamId, name: teamName.trim(), createdAt: now }
+      const product = {
+        id: newProductId,
+        name: productName.trim(),
+        color: normalizeHex(productColor),
+        createdAt: now,
+      }
+
+      setIterationPlans(nextPlans)
+      setTimeboxes(nextTimeboxes)
+      setPlanSprints(nextSprints)
+      setProjects((prev) => [...prev, project])
+      setTeams((prev) => [...prev, team])
+      setProducts((prev) => [...prev, product])
+      setProjectTeams((prev) => [...prev, { projectId: newProjectId, teamId: newTeamId }])
+      setProjectProducts((prev) => [...prev, { projectId: newProjectId, productId: newProductId }])
+      setProjectIterationPlans((prev) => [
+        ...prev.filter((pip) => pip.projectId !== newProjectId),
+        { projectId: newProjectId, planId: resolvedPlanId },
+      ])
+      setFormattingRules((prev) => [...prev, ...defaultFormattingRulesForProject(newProjectId)])
+
+      let createdFeature = null
+      if (featureName?.trim()) {
+        const featureId = getNextFeatureId(featuresRaw)
+        const startDate = defaultDates.startDate || calendarStartDate
+        const targetDate = defaultDates.targetDate || addWeeks(calendarStartDate, 1)
+        createdFeature = {
+          id: featureId,
+          projectId: newProjectId,
+          teamId: newTeamId,
+          productId: newProductId,
+          name: featureName.trim(),
+          planningStatus: 'planned',
+          startDate,
+          targetDate,
+          completed: false,
+          assignmentStatus: 'ok',
+          userStories: [],
+          notes: '',
+          comments: [],
+          dependsOn: [],
+          sortOrder: featuresRaw.length,
+          createdAt: now,
+          updatedAt: now,
+        }
+        setFeaturesRaw((prev) => [...prev, createdFeature])
+        addAuditEvent(
+          createEvent('feature.created', actor, featureId, {
+            name: createdFeature.name,
+            projectId: newProjectId,
+            teamId: newTeamId,
+            productId: newProductId,
+            planningStatus: 'planned',
+            startDate,
+            targetDate,
+          }),
+        )
+      }
+
+      addAuditEvent(
+        createEvent('project.created', actor, null, {
+          id: newProjectId,
+          name: project.name,
+          teamIds: [newTeamId],
+          planId: resolvedPlanId,
+        }),
+      )
+      addAuditEvent(createEvent('team.created', actor, null, { id: newTeamId, name: team.name }))
+      addAuditEvent(
+        createEvent('product.created', actor, null, {
+          id: newProductId,
+          name: product.name,
+          color: product.color,
+          projectIds: [newProjectId],
+        }),
+      )
+
+      setProjectId(newProjectId)
+
+      return {
+        project,
+        team,
+        product,
+        feature: createdFeature,
+        planId: resolvedPlanId,
+      }
+    },
+    [actor, addAuditEvent, featuresRaw, iterationPlans, planSprints, timeboxes],
+  )
+
   const setProjectTeamIds = useCallback(
     (targetProjectId, teamIds) => {
       setProjectTeams((prev) => {
@@ -1260,6 +1402,20 @@ export function useTimelineState() {
     [timeboxesForActivePlan],
   )
 
+  const ganttReadiness = useMemo(
+    () =>
+      getProjectGanttReadiness({
+        projectId,
+        projects,
+        projectIterationPlans,
+        timeboxes,
+        projectProducts,
+        projectTeams,
+        features: featuresRaw,
+      }),
+    [projectId, projects, projectIterationPlans, timeboxes, projectProducts, projectTeams, featuresRaw],
+  )
+
   return {
     actor,
     setActor,
@@ -1320,6 +1476,7 @@ export function useTimelineState() {
     deleteComment,
     getFeatureHistory,
     createProject,
+    setupProjectForGantt,
     renameProject,
     deleteProject,
     setProjectTeamIds,
@@ -1345,6 +1502,7 @@ export function useTimelineState() {
     resetToSeed,
     currentPiId: currentTimebox?.id ?? null,
     getDefaultFeatureDates,
+    ganttReadiness,
   }
 }
 

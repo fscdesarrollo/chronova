@@ -56,8 +56,8 @@ A functional prototype already exists in this repository (React + Vite + Tailwin
 
 - **Audience:** executives, Product Owners, RTEs, and technical leads within the company.
 - **Authentication:** none in v1.
-- **Actor identification:** a simple display name stored in `localStorage` — no user accounts, no roles.
-- **Permissions:** everyone can view and edit. All changes are recorded with actor + timestamp in the audit log.
+- **User display name:** a simple name stored in `localStorage` (sidebar label **User**) — no user accounts, no roles. Audit events still use an `actor` field internally.
+- **Permissions:** everyone can view and edit. All changes are recorded with user name + timestamp in the audit log.
 - **User management:** explicitly out of scope for v1.
 
 ---
@@ -472,15 +472,40 @@ The baseline is **per feature**, not a single PI-wide snapshot. The Gantt has me
 
 The left sidebar is the app navigation hub. It can be collapsed (icons only + tooltips) or expanded (icons + labels). Collapsed/expanded state persists in `localStorage`.
 
-| Section | Content |
-|---------|---------|
-| **Home** | Brand landing page (default on app open): hero, pillars, CTAs to Timeline and Projects |
+Navigation is grouped visually (separators between groups):
+
+| Group | Pages |
+|-------|-------|
+| **Landing** | **Home** |
+| **Work** | **Timeline** |
+| **Configuration** | Projects, Iterations, Teams, Products |
+
+| Page | Content |
+|------|---------|
+| **Home** | Brand landing: hero, pillars, **Take a tour** (highlighted on first visit), continue to last page, setup wizard |
 | **Timeline** | Main Gantt view |
-| **Projects** | Project list + CRUD (create, rename, delete) |
+| **Projects** | Project list + CRUD; assign iteration plan and teams |
+| **Iterations** | Reusable iteration plans, timeboxes (PIs), sprints |
 | **Teams** | Global team registry + CRUD + assign/unassign to projects |
 | **Products** | Global product catalog + CRUD + color picker + project assignment |
 
-The **active project** selector and **View** filter live in the sidebar on the **Timeline** page only.
+The **active project** selector, **View** filter, and **User** name field live in the sidebar (project/view filters on **Timeline** only).
+
+#### Onboarding and first-run UX
+
+Chronova is **Gantt-centric**: configuration pages are prerequisites; the goal is a project ready to plan on the Timeline.
+
+| Flow | Behavior |
+|------|----------|
+| **First open** | No `chronova-navigation` → land on **Home** |
+| **Return visit** | `chronova-navigation.lastPage` → restore last page (e.g. Timeline) |
+| **Product tour** (`app-intro`) | Spotlight walkthrough with **real page navigation**; relaunchable from Home (**Take a tour**). Registry: `src/tours/registry.js`; runner: `TourRunner`. Elements use `data-tour` attributes. Final step: offer setup or **Skip setup for now**. |
+| **Tour CTA highlight** | On first Home visit (no navigation history, tour not completed), **Take a tour** shows an animated futuristic highlight (“Start here”). |
+| **Setup wizard** | On demand only (Home, tour end, checklist). Steps: User name → Project + calendar start → Team → First feature. Calls `setupProjectForGantt` (auto-creates plan/timebox/product if needed). Does **not** open automatically on app load. |
+| **Gantt checklist** | On Timeline when project is not Gantt-ready: project → calendar → product → team → first feature on Gantt. Dismissible. |
+| **Gantt-ready** | Computed by `ganttReadiness` (`src/utils/ganttReadiness.js`): plan with timebox, product assigned, team assigned; first bar optional for “complete” checklist. |
+
+Per-page tours (e.g. Timeline-only) are planned via the same tour registry pattern (v2).
 
 **View filter** (Timeline page — replaces "Team view"):
 
@@ -496,12 +521,13 @@ State model: `viewMode: 'all' | 'backlog' | 'team'` + `filterTeamId` when `viewM
 
 | Screen / area | Content |
 |---------------|---------|
-| Sidebar | Collapsible navigation: **Home**, Timeline, Projects, **Iterations**, Teams, Products + active project + **View** filter (Timeline only) |
-| Top bar | Page title; on Timeline only: `Plan: {name}`; **Gantt settings** + **Add Feature** (Timeline only). Dark variant on Home. Current/Baseline toggle removed. |
-| Home | Dark futuristic hero (`TimeHorizon` animation): brand copy, See / Preserve / Adapt pillars, **Open Timeline** + **Configure project** CTAs |
+| Sidebar | Grouped nav: **Home** · Timeline · Projects, Iterations, Teams, Products; **User** name; active project + **View** filter (Timeline only) |
+| Top bar | Page title; on Timeline only: `Plan: {name}`; **Gantt settings** + **Add Feature** (Timeline only). Dark variant on Home. |
+| Home | `TimeHorizon` background, `BrandWordmark`, pillars, CTAs: **Take a tour**, continue to last page, setup wizard, advanced configuration |
+| Onboarding | See [Onboarding and first-run UX](#onboarding-and-first-run-ux) above |
 | Gantt settings | Gear icon in top bar; modal with **Markers** and **Rules** (editable condition/action builder) tabs |
-| Add Feature modal | Backlog: empty dates default; planned: team + PI-pre-filled dates required |
-| Feature panel | **Collapse all** / **Expand all**; collapsible section headers |
+| Add Feature modal | Backlog or planned; blocked until project has a product; planned path needs team + calendar for Gantt bar |
+| Feature panel | Compact layout: team + dates + Delivered (locks dates when checked), notes, dependencies, user stories; **Comments** and **History** collapsible at bottom |
 | Timeline header | PIs → sprints → weeks; **TODAY** pill; **plan markers** (grouped when same date) |
 | Today marker | Auto-calculated vertical line at current day; **TODAY** label in fixed shared header row; horizontal scroll synced with Gantt body |
 | Plan markers | Per-project vertical markers; grouped pill when same date; expand to list; single body line per date |
@@ -509,7 +535,7 @@ State model: `viewMode: 'all' | 'backlog' | 'team'` + `filterTeamId` when `viewM
 | Backlog section | Features without team — panel row only, no Gantt bar |
 | Feature name panel | Split-pane left column — shared header row with timeline; bodies scroll in sync below |
 | Footer | Feature count with **valid Gantt bar** only, total SPs (same scope), moved count; drag hints |
-| Feature detail (on click) | Name, team, dates, notes, comments, dependencies, US, history; **Save changes** for core fields; closes on click outside (with unsaved prompt) |
+| Feature detail (on click) | Name, team, dates (locked when Delivered), notes, dependencies, US; Comments and History at end; **Save changes**; closes on click outside (with unsaved prompt) |
 
 | Interaction | Behavior |
 |-------------|----------|
@@ -527,7 +553,7 @@ State model: `viewMode: 'all' | 'backlog' | 'team'` + `filterTeamId` when `viewM
 | Drag row | Reorder within/between team sections; team changes when dropped under a different team header |
 | Timeline scroll memory | Per project; saved when **leaving Timeline page** (not on F5 refresh); restored on return; defaults to centered on Today |
 | Gantt markers | Create/edit/delete via Settings modal; grouped display when same date; scroll to new marker date after save |
-| Rules | Configure in Gantt Settings → Rules; evaluated in Current and Baseline views |
+| Rules | Configure in Gantt Settings → Rules; evaluated in the current plan view |
 | Feature dependencies | Configure in detail panel; focus highlight on select |
 | Comments | Add/edit/delete (own) in detail panel; presence icon on row |
 | Notes | Edit in detail panel; note icon on row when non-empty |
@@ -677,8 +703,10 @@ All data lives in the browser until MVP 3 adds a backend:
 | Iteration plans, timeboxes, sprints, project_iteration_plans | Serialized to `localStorage` |
 | Features, US, baselines | Serialized to `localStorage` |
 | Audit events | Appended in `localStorage` (same structure as future DB model) |
-| Actor name | `localStorage` key `chronova-actor` |
-| Layout preferences | Sidebar collapsed state, left column width, feature panel collapsed |
+| User display name | `localStorage` key `chronova-actor` (UI label **User**; audit field `actor`) |
+| Navigation memory | `chronova-navigation`: `{ hasVisited, lastPage }` — new users → Home; returning → last page |
+| Onboarding state | `chronova-onboarding`: `{ wizardCompleted, tourCompleted, checklistDismissed }` |
+| Layout preferences | Sidebar collapsed state, left column width, feature panel collapsed (`chronova-layout`) |
 | Timeline scroll position | Per-project view (`chronova-view`); saved on leaving Timeline page; defaults to Today on first visit |
 | Timeline markers | Per-project markers (`timelineMarkers` in main state) |
 | Rules | Per-project rules (`formattingRules` in main state; UI label **Rules**) |
@@ -695,12 +723,15 @@ This keeps data shapes aligned with the [future data model](#data-model-future-m
 
 ```
 src/
-  components/     React UI (Sidebar, TopNav, TimelineGrid, GanttSettingsModal, management pages, etc.)
+  components/     React UI (Sidebar, TopNav, TimelineGrid, GanttSettingsModal, pages, BrandWordmark, …)
+  components/onboarding/  SetupWizard, TourRunner, GanttSetupChecklist, TourCtaHighlight
+  components/pages/       Home, Projects, Iterations, Teams, Products
+  tours/          Tour registry (`app-intro`; extensible per page)
   hooks/          useTimelineState, useFeatureDrag, useLeftColResize
-  utils/          dates, storage, weekCalendar, timelineLayout, featureGroups, migration
-  data.js         Static PI/sprint seed data
+  utils/          dates, storage, navigation, onboarding, ganttReadiness, weekCalendar, migration, …
+  data.js         Static seed data
   constants.js    Layout dimensions and drag helpers
-docs/             Project documentation
+docs/             Project documentation (project.md, brand.md)
 ```
 
 ### Client-side data shape (MVP 1.5 / 1.6 / 1.7)
@@ -996,7 +1027,7 @@ These were not explicitly discussed but are assumed unless changed:
 |-------|---------|
 | Architecture | Frontend-only SPA, no backend (through MVP 2) |
 | Data persistence | `localStorage` — projects, teams, products, features, baselines, audit events, layout |
-| Actor storage | `localStorage` key `chronova-actor` |
+| User display name | `localStorage` key `chronova-actor` (UI label **User**; audit field `actor`) |
 | Left column width | Default 280px; min 200px, max 720px; collapsed 52px; persisted in `localStorage` |
 | Sidebar | Collapsible; state persisted |
 | Move reason | **TBD (MVP 2)** — required or optional |
@@ -1019,16 +1050,19 @@ What the codebase already validates:
 | Timeline header (PIs, sprints, weeks) | Done — Planning week distinction pending |
 | Feature rows with status dot and deviation | Done |
 | Gantt bars with color and completion | Done |
-| Drag & drop (bars and rows) | Done — includes team change on section drop |
-| Current/Baseline toggle | UI only — comparison logic in MVP 2; markers visible in both |
+| Drag & drop (bars and rows) | Done — includes team change on section drop; blocked when feature is Delivered |
 | Footer summary | Done |
 | Seed data (3 PIs: 26.2–26.4) | Done |
 | Add Feature modal | Done |
-| Feature detail panel (dates, US) | Done — closes on outside click |
+| Feature detail panel | Done — compact layout; Delivered locks dates; Comments/History at end |
 | Client-side persistence (`localStorage`) | Done |
-| Actor name setup | Done |
+| User display name (sidebar) | Done — no blocking modal on app load |
+| Home landing + brand chrome | Done — TimeHorizon, BrandWordmark, pillars |
+| Onboarding: product tour | Done — `app-intro`, spotlight, real navigation |
+| Onboarding: setup wizard + Gantt checklist | Done — `setupProjectForGantt`, `ganttReadiness` |
+| Navigation memory (Home vs last page) | Done — `chronova-navigation` |
 | Project hierarchy + navigation | Done |
-| Collapsible sidebar with management pages | Done |
+| Collapsible sidebar with grouped nav | Done — Home · Timeline · Configuration |
 | Team view toggle (All / Single) | Done |
 | Assignment status icons | Done |
 | Product CRUD + color picker | Done |
@@ -1081,7 +1115,7 @@ Application structure, navigation, and organizational model. Builds on MVP 1.
 | 9 | **Products per project** | Global product catalog; assigned to projects via `project_products`; shared across teams |
 | 10 | **Product CRUD + color picker** | Create, rename, recolor (hex + native picker); delete blocked if features exist |
 | 11 | **Orphaned products** | On empty project delete, products become `project_unassigned` |
-| 12 | **Collapsible sidebar navigation** | Pages: Timeline, Projects, Iterations, Teams, Products |
+| 12 | **Collapsible sidebar navigation** | Pages: **Home**, Timeline, Projects, Iterations, Teams, Products (grouped); User field in sidebar |
 | 13 | **Resizable feature panel** | Left Gantt column draggable; width persisted in `localStorage` |
 | 14 | **Full feature name visibility** | Names expand as panel widens; no truncate-only when space allows |
 | 15 | **Edit feature name** | Editable in detail panel; immediate update in list and bar |
@@ -1254,7 +1288,10 @@ Build on MVP 1.5 without adding a backend:
 | **Deviation** | Difference between current and baseline dates (at week granularity) |
 | **Cross-PI** | Feature spanning more than one Program Increment |
 | **SP** | Story Points — effort estimation unit |
-| **Actor** | Person who made a change (simple name, no login) |
+| **User** | Display name of the person making changes (UI); stored as `chronova-actor`; audit field `actor` |
+| **Product tour** | Guided spotlight walkthrough (`app-intro`); extensible via `src/tours/registry.js` |
+| **Setup wizard** | Multi-step flow to create project, calendar, team, and first Gantt feature |
+| **Gantt-ready** | Project has plan/timebox, product, and team — can add planned features to the Timeline |
 
 ---
 
@@ -1298,3 +1335,7 @@ Build on MVP 1.5 without adding a backend:
 | 2026-08-08 | Feature ID: auto-generated integer identity on save; custom ID input removed; legacy `F-*` migrated |
 | 2026-08-08 | **Iterations Phase A:** reusable iteration plans (SAFe PIs/sprints); one plan per project; timeline calendar derived from plan; current timebox = contains today |
 | 2026-08-08 | Iterations UX: project assign only on Projects; Create iteration; sprint name/type/scale (day/week/month); remove Current/Baseline + breadcrumb; Plan label on Timeline; single page titles |
+| 2026-08-09 | **Home** landing: TimeHorizon, BrandWordmark, sidebar groups (Home · Timeline · Configuration) |
+| 2026-08-09 | **Onboarding:** product tour (`app-intro`), setup wizard, Gantt checklist, `ganttReadiness`, `setupProjectForGantt`; navigation memory (`chronova-navigation`) |
+| 2026-08-09 | UI: User label in sidebar (replaces Actor modal); feature panel UX polish; Delivered locks dates; dependency ID normalization |
+| 2026-08-09 | First-visit **Take a tour** CTA highlight on Home |

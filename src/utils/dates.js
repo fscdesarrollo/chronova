@@ -40,3 +40,12 @@ export function addDays(iso, days) {
 export function addWeeks(iso, weeks) {
   return addDays(iso, weeks * 7)
 }
+
+/** Next Monday on or after today — useful as default PI start. */
+export function suggestCalendarStartDate(fromDate = new Date()) {
+  const date = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate())
+  const day = date.getDay()
+  const daysUntilMonday = day === 0 ? 1 : day === 1 ? 0 : 8 - day
+  date.setDate(date.getDate() + daysUntilMonday)
+  return toISODate(date)
+}

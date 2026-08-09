@@ -10,6 +10,7 @@ export default function AddFeatureModal({
   teams,
   products,
   defaultDates,
+  canPlanOnGantt = true,
 }) {
   const [name, setName] = useState('')
   const [teamId, setTeamId] = useState(BACKLOG_VALUE)
@@ -23,12 +24,18 @@ export default function AddFeatureModal({
   useEffect(() => {
     if (!open) return
     setName('')
-    setTeamId(BACKLOG_VALUE)
+    const defaultTeam = canPlanOnGantt && teams[0]?.id ? teams[0].id : BACKLOG_VALUE
+    setTeamId(defaultTeam)
     setProductId(products[0]?.id ?? '')
-    setStartDate('')
-    setTargetDate('')
+    if (defaultTeam === BACKLOG_VALUE) {
+      setStartDate('')
+      setTargetDate('')
+    } else {
+      setStartDate(defaultDates.startDate)
+      setTargetDate(defaultDates.targetDate)
+    }
     setError('')
-  }, [open, products])
+  }, [open, products, teams, canPlanOnGantt, defaultDates.startDate, defaultDates.targetDate])
 
   const handleTeamChange = (value) => {
     setTeamId(value)
@@ -161,6 +168,13 @@ export default function AddFeatureModal({
               />
             </div>
           </div>
+
+          {!canPlanOnGantt && (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Assign a calendar, product, and team to this project to place features on the Gantt.
+              You can still add backlog items here.
+            </p>
+          )}
 
           {isBacklog && (
             <p className="text-xs text-gray-500">
