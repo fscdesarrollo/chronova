@@ -62,7 +62,7 @@ export default function Sidebar({
         ) : (
           <div className="min-w-0 px-2">
             <p className="truncate">
-              <BrandWordmark compact className="text-sm" />
+              <BrandWordmark compact className="text-xs" />
             </p>
             <p className="truncate text-[10px] text-gray-500">{APP_TAGLINE}</p>
           </div>

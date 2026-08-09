@@ -22,7 +22,7 @@ export default function HomePage({ activeProject, onOpenTimeline, onConfigurePro
         </div>
 
         <h2 className="mb-4">
-          <BrandWordmark className="text-4xl md:text-5xl" />
+          <BrandWordmark className="text-3xl md:text-4xl" />
         </h2>
 
         <p className="mb-2 text-lg font-medium italic text-violet-200/90 md:text-xl">
