@@ -6,7 +6,6 @@ import TimelineHeader from './TimelineHeader'
 import { TodayBodyLine, TimelineMarkerBodyLine } from './TimelineMarkers'
 import { useFeatureDrag, ROW_HEIGHT } from '../hooks/useFeatureDrag'
 import { useLeftColResize } from '../hooks/useLeftColResize'
-import { CURRENT_PI_START_WEEK, TOTAL_WEEKS, weekCalendar } from '../data'
 import { LEFT_COL_COLLAPSED_WIDTH, SECTION_ROW_HEIGHT, WEEK_WIDTH } from '../constants'
 import { loadTimelineView, saveTimelineView } from '../utils/storage'
 import {
@@ -25,6 +24,7 @@ function rowHeight(row) {
 
 export default function TimelineGrid({
   projectId,
+  calendar,
   timelineRows,
   allFeatures = [],
   markers = [],
@@ -43,6 +43,13 @@ export default function TimelineGrid({
   onSelectFeature,
   onDeselectFeature,
 }) {
+  const weekCalendar = calendar?.weeks ?? []
+  const totalWeeks = calendar?.totalWeeks ?? 0
+  const totalWidth = calendar?.totalWidth
+    ?? weekCalendar.reduce((s, w) => s + (w.width ?? WEEK_WIDTH), 0)
+  const currentStartWeek = calendar?.currentTimeboxStartWeek ?? calendar?.timeboxes?.[0]?.startWeek ?? 0
+  const fallbackScrollLeft = weekCalendar[currentStartWeek]?.left
+    ?? currentStartWeek * WEEK_WIDTH
   const effectiveColWidth = leftColCollapsed ? LEFT_COL_COLLAPSED_WIDTH : leftColWidth
   const leftBodyRef = useRef(null)
   const headerScrollRef = useRef(null)
@@ -53,7 +60,12 @@ export default function TimelineGrid({
   const scrollPositionRef = useRef({ scrollLeft: 0, scrollTop: 0 })
   const [expandedMarkerDates, setExpandedMarkerDates] = useState(() => new Set())
 
-  const { gridRef, rowsRef, drag, beginDrag } = useFeatureDrag(timelineRows, onMove, 0)
+  const { gridRef, rowsRef, drag, beginDrag } = useFeatureDrag(
+    timelineRows,
+    onMove,
+    0,
+    calendar,
+  )
   const { startResize } = useLeftColResize({
     onWidthChange: onLeftColWidthChange,
     onCollapsedChange: (next) => {
@@ -64,12 +76,12 @@ export default function TimelineGrid({
 
   const todayPosition = useMemo(
     () => getTodayTimelinePosition(weekCalendar, WEEK_WIDTH),
-    [],
+    [weekCalendar],
   )
 
   const markerGroups = useMemo(
     () => buildGroupedMarkerLayout(markers, weekCalendar, WEEK_WIDTH),
-    [markers],
+    [markers, weekCalendar],
   )
 
   const dependencyFocusIds = useMemo(() => {
@@ -118,7 +130,7 @@ export default function TimelineGrid({
       applyScroll(Math.max(0, pos - grid.clientWidth / 2), grid.scrollTop)
       shouldPersistViewRef.current = true
     },
-    [applyScroll, gridRef],
+    [applyScroll, gridRef, weekCalendar],
   )
 
   useEffect(() => {
@@ -137,18 +149,17 @@ export default function TimelineGrid({
       shouldPersistViewRef.current = true
       applyScroll(saved.scrollLeft, saved.scrollTop)
     } else {
-      const fallback = CURRENT_PI_START_WEEK * WEEK_WIDTH
       const scrollLeft = scrollLeftForToday(
         weekCalendar,
         WEEK_WIDTH,
         grid.clientWidth,
-        fallback,
+        fallbackScrollLeft,
       )
       applyScroll(scrollLeft, 0)
     }
 
     scrollInitializedRef.current = true
-  }, [projectId, applyScroll, gridRef])
+  }, [projectId, applyScroll, gridRef, weekCalendar, fallbackScrollLeft])
 
   useEffect(() => {
     if (!scrollToDate) return
@@ -202,7 +213,7 @@ export default function TimelineGrid({
   )
 
   const showFullNames = !leftColCollapsed && leftColWidth >= 340
-  const timelineWidth = TOTAL_WEEKS * WEEK_WIDTH
+  const timelineWidth = totalWidth
   const bodyMinHeight = timelineRows.reduce((sum, row) => sum + rowHeight(row), 0)
 
   const getRowVisualState = (featureId) => {
@@ -227,6 +238,7 @@ export default function TimelineGrid({
           aria-hidden
         >
           <TimelineHeader
+            calendar={calendar}
             todayPosition={todayPosition}
             markerGroups={markerGroups}
             expandedMarkerDates={expandedMarkerDates}
@@ -335,6 +347,8 @@ export default function TimelineGrid({
                     isDragging={drag?.featureId === feature.id}
                     isDimmed={isDimmed}
                     formatting={formatting}
+                    totalWidth={totalWidth}
+                    units={weekCalendar}
                     dragStyle={drag?.featureId === feature.id ? drag.barStyle : null}
                     onBarPointerDown={(e) => beginDrag(e, feature.id, 'bar', e.currentTarget)}
                     onSelect={() => onSelectFeature(feature.id)}

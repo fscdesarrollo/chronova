@@ -1,19 +1,31 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  CURRENT_PI_ID,
-  getDefaultFeatureDates,
-  getNextFeatureId,
   seedFeatures,
+  seedIterationPlans,
   seedProducts,
+  seedProjectIterationPlans,
   seedProjectProducts,
   seedProjectTeams,
   seedProjects,
+  seedSprints,
   seedTeams,
-  weekCalendar,
+  seedTimeboxes,
 } from '../data'
 import { normalizeHex } from '../utils/colors'
+import { addDays } from '../utils/dates'
 import { buildTimelineRows, allSectionIdsInRows } from '../utils/featureGroups'
-import { nextMarkerId, nextProductId, nextProjectId, nextTeamId, resetIdCounters, resetMarkerCounter } from '../utils/ids'
+import {
+  getNextFeatureId,
+  nextMarkerId,
+  nextPlanId,
+  nextProductId,
+  nextProjectId,
+  nextSprintId,
+  nextTeamId,
+  nextTimeboxId,
+  resetIdCounters,
+  resetMarkerCounter,
+} from '../utils/ids'
 import {
   applyProjectFeatureOrder,
   findSectionForVisualIndex,
@@ -29,9 +41,18 @@ import {
   refreshFeatureAssignmentStatuses,
 } from '../utils/migration'
 import { defaultFormattingRulesForProject } from '../utils/formattingRules'
-import { hasDependencyCycle, normalizeDependsOn } from '../utils/dependencies'
+import { hasDependencyCycle, normalizeDependsOn, sameFeatureId } from '../utils/dependencies'
 import { loadActor, loadLayout, loadState, saveActor, saveLayout, saveState } from '../utils/storage'
-import { featureWeekSpan, isCrossPi } from '../utils/weekCalendar'
+import { featureBarPixels, isCrossPi } from '../utils/weekCalendar'
+import {
+  buildCalendarFromPlan,
+  buildSafeSprints,
+  deriveTimeboxDates,
+  emptyCalendar,
+  findCurrentTimebox,
+  getDefaultFeatureDatesFromPlan,
+  planIdForProject,
+} from '../utils/iterationPlans'
 
 let eventIdCounter = 1
 let commentIdCounter = 1
@@ -64,7 +85,7 @@ function applyFeatureEditPreview(feature, preview, projectTeams) {
   }
 }
 
-function enrichFeature(feature, products, teams) {
+function enrichFeature(feature, products, teams, calendarWeeks) {
   const product = products.find((p) => p.id === feature.productId)
   const team = teams.find((t) => t.id === feature.teamId)
   const storyPoints = (feature.userStories || []).reduce((s, us) => s + (us.storyPoints || 0), 0)
@@ -77,13 +98,17 @@ function enrichFeature(feature, products, teams) {
 
   let startWeek = 0
   let duration = 1
+  let barLeft = 0
+  let barWidth = 0
   let crossPi = false
 
-  if (feature.startDate && feature.targetDate) {
-    const span = featureWeekSpan(weekCalendar, feature.startDate, feature.targetDate)
-    startWeek = span.startWeek
-    duration = span.duration
-    crossPi = isCrossPi(weekCalendar, feature.startDate, feature.targetDate)
+  if (feature.startDate && feature.targetDate && calendarWeeks?.length) {
+    const pixels = featureBarPixels(calendarWeeks, feature.startDate, feature.targetDate)
+    startWeek = pixels.startWeek
+    duration = pixels.duration
+    barLeft = pixels.left
+    barWidth = pixels.width
+    crossPi = isCrossPi(calendarWeeks, feature.startDate, feature.targetDate)
   }
 
   return {
@@ -93,6 +118,8 @@ function enrichFeature(feature, products, teams) {
     crossPi,
     startWeek,
     duration,
+    barLeft,
+    barWidth,
     onGantt,
     hasComments,
     hasNotes,
@@ -121,6 +148,12 @@ export function useTimelineState() {
   const [projectTeams, setProjectTeams] = useState(initial.projectTeams)
   const [products, setProducts] = useState(initial.products)
   const [projectProducts, setProjectProducts] = useState(initial.projectProducts)
+  const [iterationPlans, setIterationPlans] = useState(initial.iterationPlans ?? seedIterationPlans)
+  const [timeboxes, setTimeboxes] = useState(initial.timeboxes ?? seedTimeboxes)
+  const [planSprints, setPlanSprints] = useState(initial.sprints ?? seedSprints)
+  const [projectIterationPlans, setProjectIterationPlans] = useState(
+    initial.projectIterationPlans ?? seedProjectIterationPlans,
+  )
   const [featuresRaw, setFeaturesRaw] = useState(initial.features)
   const [timelineMarkers, setTimelineMarkers] = useState(initial.timelineMarkers ?? [])
   const [formattingRules, setFormattingRules] = useState(initial.formattingRules ?? [])
@@ -147,9 +180,9 @@ export function useTimelineState() {
   const [layout, setLayoutState] = useState(loadLayout)
 
   useEffect(() => {
-    resetIdCounters({ projects, teams, products })
+    resetIdCounters({ projects, teams, products, iterationPlans, timeboxes, sprints: planSprints })
     resetMarkerCounter(timelineMarkers)
-  }, [projects, teams, products, timelineMarkers])
+  }, [projects, teams, products, iterationPlans, timeboxes, planSprints, timelineMarkers])
 
   useEffect(() => {
     setFeatureEditPreviewState(null)
@@ -171,19 +204,76 @@ export function useTimelineState() {
     })
   }, [])
 
+  const activePlanId = useMemo(
+    () => planIdForProject(projectIterationPlans, projectId),
+    [projectIterationPlans, projectId],
+  )
+
+  const activePlan = useMemo(
+    () => iterationPlans.find((p) => p.id === activePlanId) ?? null,
+    [iterationPlans, activePlanId],
+  )
+
+  const timeboxesForActivePlan = useMemo(
+    () => timeboxes.filter((t) => t.planId === activePlanId),
+    [timeboxes, activePlanId],
+  )
+
+  const sprintsForActivePlan = useMemo(() => {
+    const tbIds = new Set(timeboxesForActivePlan.map((t) => t.id))
+    return planSprints.filter((s) => tbIds.has(s.timeboxId))
+  }, [planSprints, timeboxesForActivePlan])
+
+  const projectCalendar = useMemo(() => {
+    if (!activePlanId || !timeboxesForActivePlan.length) return emptyCalendar()
+    const built = buildCalendarFromPlan(timeboxesForActivePlan, sprintsForActivePlan)
+    const current = findCurrentTimebox(timeboxesForActivePlan)
+    return {
+      ...built,
+      currentTimeboxId: current?.id ?? null,
+      currentTimeboxStartWeek: current ? (built.piWeekMap[current.id] ?? 0) : 0,
+    }
+  }, [activePlanId, timeboxesForActivePlan, sprintsForActivePlan])
+
+  const calendarsByProjectId = useMemo(() => {
+    const map = new Map()
+    for (const project of projects) {
+      const planId = planIdForProject(projectIterationPlans, project.id)
+      if (!planId) {
+        map.set(project.id, emptyCalendar())
+        continue
+      }
+      const tbs = timeboxes.filter((t) => t.planId === planId)
+      const tbIds = new Set(tbs.map((t) => t.id))
+      const sprs = planSprints.filter((s) => tbIds.has(s.timeboxId))
+      map.set(project.id, buildCalendarFromPlan(tbs, sprs))
+    }
+    return map
+  }, [projects, projectIterationPlans, timeboxes, planSprints])
+
   const enrichedFeatures = useMemo(
-    () => sortFeatures(featuresRaw.map((f) => enrichFeature(f, products, teams))),
-    [featuresRaw, products, teams],
+    () =>
+      sortFeatures(
+        featuresRaw.map((f) =>
+          enrichFeature(f, products, teams, calendarsByProjectId.get(f.projectId)?.weeks ?? []),
+        ),
+      ),
+    [featuresRaw, products, teams, calendarsByProjectId],
   )
 
   const timelineEnrichedFeatures = useMemo(
     () =>
       sortFeatures(
         featuresRaw.map((f) =>
-          enrichFeature(applyFeatureEditPreview(f, featureEditPreview, projectTeams), products, teams),
+          enrichFeature(
+            applyFeatureEditPreview(f, featureEditPreview, projectTeams),
+            products,
+            teams,
+            calendarsByProjectId.get(f.projectId)?.weeks ?? [],
+          ),
         ),
       ),
-    [featuresRaw, products, teams, featureEditPreview, projectTeams],
+    [featuresRaw, products, teams, featureEditPreview, projectTeams, calendarsByProjectId],
   )
 
   const projectTeamsForActive = useMemo(
@@ -261,6 +351,10 @@ export function useTimelineState() {
       projectTeams,
       products,
       projectProducts,
+      iterationPlans,
+      timeboxes,
+      sprints: planSprints,
+      projectIterationPlans,
       features: featuresRaw,
       timelineMarkers,
       formattingRules,
@@ -270,7 +364,25 @@ export function useTimelineState() {
       filterTeamId,
       collapsedSections,
     })
-  }, [projects, teams, projectTeams, products, projectProducts, featuresRaw, timelineMarkers, formattingRules, auditEvents, projectId, viewMode, filterTeamId, collapsedSections])
+  }, [
+    projects,
+    teams,
+    projectTeams,
+    products,
+    projectProducts,
+    iterationPlans,
+    timeboxes,
+    planSprints,
+    projectIterationPlans,
+    featuresRaw,
+    timelineMarkers,
+    formattingRules,
+    auditEvents,
+    projectId,
+    viewMode,
+    filterTeamId,
+    collapsedSections,
+  ])
 
   useEffect(() => {
     saveLayout(layout)
@@ -291,7 +403,7 @@ export function useTimelineState() {
 
   const addFeature = useCallback(
     (data) => {
-      const id = data.id || getNextFeatureId(featuresRaw)
+      const id = getNextFeatureId(featuresRaw)
       const now = new Date().toISOString()
       const isBacklog = !data.teamId
       const teamId = isBacklog ? null : data.teamId
@@ -383,8 +495,8 @@ export function useTimelineState() {
           }
           next.dependsOn = deps
           const currentDeps = normalizeDependsOn(current.dependsOn)
-          const added = deps.filter((d) => !currentDeps.includes(d))
-          const removed = currentDeps.filter((d) => !deps.includes(d))
+          const added = deps.filter((d) => !currentDeps.some((c) => sameFeatureId(c, d)))
+          const removed = currentDeps.filter((d) => !deps.some((c) => sameFeatureId(c, d)))
           added.forEach((depId) => {
             pendingEvents.push(
               createEvent('feature.dependency_added', actor, id, { dependsOnId: depId }),
@@ -438,6 +550,8 @@ export function useTimelineState() {
         if (fromIndex === -1) return prev
 
         const current = prev[fromIndex]
+        if (current.completed) return prev
+
         const onGantt = isOnGantt(current)
         const moved = onGantt && (current.startDate !== startDate || current.targetDate !== targetDate)
 
@@ -716,7 +830,7 @@ export function useTimelineState() {
   // --- Project CRUD ---
 
   const createProject = useCallback(
-    (name, teamIds = []) => {
+    (name, teamIds = [], iterationPlanId = null) => {
       const id = nextProjectId()
       const now = new Date().toISOString()
       const project = { id, name: name.trim(), createdAt: now }
@@ -728,11 +842,20 @@ export function useTimelineState() {
           ...teamIds.map((teamId) => ({ projectId: id, teamId })),
         ])
       }
-      addAuditEvent(createEvent('project.created', actor, null, { id, name: project.name, teamIds }))
+      const planId = iterationPlanId || iterationPlans[0]?.id || null
+      if (planId) {
+        setProjectIterationPlans((prev) => [
+          ...prev.filter((pip) => pip.projectId !== id),
+          { projectId: id, planId },
+        ])
+      }
+      addAuditEvent(
+        createEvent('project.created', actor, null, { id, name: project.name, teamIds, planId }),
+      )
       setProjectId(id)
       return project
     },
-    [actor, addAuditEvent],
+    [actor, addAuditEvent, iterationPlans],
   )
 
   const setProjectTeamIds = useCallback(
@@ -770,6 +893,7 @@ export function useTimelineState() {
 
       setProjectProducts((prev) => prev.filter((pp) => pp.projectId !== id))
       setProjectTeams((prev) => prev.filter((pt) => pt.projectId !== id))
+      setProjectIterationPlans((prev) => prev.filter((pip) => pip.projectId !== id))
       setProjects((prev) => {
         const next = prev.filter((p) => p.id !== id)
         if (projectId === id) {
@@ -970,6 +1094,10 @@ export function useTimelineState() {
     setProjectTeams(seedProjectTeams)
     setProducts(seedProducts)
     setProjectProducts(seedProjectProducts)
+    setIterationPlans(seedIterationPlans)
+    setTimeboxes(seedTimeboxes)
+    setPlanSprints(seedSprints)
+    setProjectIterationPlans(seedProjectIterationPlans)
     setFeaturesRaw(seedFeatures.map((f) => ({ ...f, projectId: f.projectId, assignmentStatus: 'ok', planningStatus: 'planned' })))
     setTimelineMarkers([])
     setFormattingRules(seedProjects.flatMap((p) => defaultFormattingRulesForProject(p.id)))
@@ -980,6 +1108,157 @@ export function useTimelineState() {
     setCollapsedSections({})
     eventIdCounter = 1
   }, [])
+
+  // --- Iteration plan CRUD ---
+
+  const createIterationPlan = useCallback(
+    (name) => {
+      const id = nextPlanId()
+      const plan = {
+        id,
+        name: name.trim(),
+        methodology: 'safe',
+        createdAt: new Date().toISOString(),
+      }
+      setIterationPlans((prev) => [...prev, plan])
+      addAuditEvent(createEvent('iteration_plan.created', actor, null, { id, name: plan.name }))
+      return plan
+    },
+    [actor, addAuditEvent],
+  )
+
+  const renameIterationPlan = useCallback(
+    (id, name) => {
+      setIterationPlans((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, name: name.trim() } : p)),
+      )
+      addAuditEvent(createEvent('iteration_plan.renamed', actor, null, { id, name: name.trim() }))
+    },
+    [actor, addAuditEvent],
+  )
+
+  const deleteIterationPlan = useCallback(
+    (id) => {
+      const assignedCount = projectIterationPlans.filter((pip) => pip.planId === id).length
+      if (assignedCount > 0) {
+        return { ok: false, reason: 'Plan is assigned to one or more projects' }
+      }
+      const tbIds = timeboxes.filter((t) => t.planId === id).map((t) => t.id)
+      setPlanSprints((prev) => prev.filter((s) => !tbIds.includes(s.timeboxId)))
+      setTimeboxes((prev) => prev.filter((t) => t.planId !== id))
+      setIterationPlans((prev) => prev.filter((p) => p.id !== id))
+      addAuditEvent(createEvent('iteration_plan.deleted', actor, null, { id }))
+      return { ok: true }
+    },
+    [actor, addAuditEvent, projectIterationPlans, timeboxes],
+  )
+
+  const setProjectIterationPlan = useCallback(
+    (targetProjectId, planId) => {
+      setProjectIterationPlans((prev) => {
+        const filtered = prev.filter((pip) => pip.projectId !== targetProjectId)
+        if (!planId) return filtered
+        return [...filtered, { projectId: targetProjectId, planId }]
+      })
+      addAuditEvent(
+        createEvent('project.iteration_plan_assigned', actor, null, {
+          projectId: targetProjectId,
+          planId,
+        }),
+      )
+    },
+    [actor, addAuditEvent],
+  )
+
+  const createTimebox = useCallback(
+    (planId, name, startDate) => {
+      const id = nextTimeboxId()
+      const trimmed = name.trim()
+      const sprintList = buildSafeSprints(id, trimmed, startDate, () => nextSprintId())
+      const { endDate } = deriveTimeboxDates(sprintList)
+      const sortOrder = timeboxes.filter((t) => t.planId === planId).length
+      const timebox = {
+        id,
+        planId,
+        name: trimmed,
+        startDate,
+        endDate,
+        sortOrder,
+      }
+      setTimeboxes((prev) => [...prev, timebox])
+      setPlanSprints((prev) => [...prev, ...sprintList])
+      addAuditEvent(
+        createEvent('timebox.created', actor, null, { id, planId, name: trimmed, startDate, endDate }),
+      )
+      return timebox
+    },
+    [actor, addAuditEvent, timeboxes],
+  )
+
+  const updateTimebox = useCallback(
+    (id, updates) => {
+      setTimeboxes((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, ...updates, name: updates.name?.trim?.() ?? t.name } : t)),
+      )
+      addAuditEvent(createEvent('timebox.updated', actor, null, { id, ...updates }))
+    },
+    [actor, addAuditEvent],
+  )
+
+  const deleteTimebox = useCallback(
+    (id) => {
+      setPlanSprints((prev) => prev.filter((s) => s.timeboxId !== id))
+      setTimeboxes((prev) => prev.filter((t) => t.id !== id))
+      addAuditEvent(createEvent('timebox.deleted', actor, null, { id }))
+      return { ok: true }
+    },
+    [actor, addAuditEvent],
+  )
+
+  const updateSprint = useCallback(
+    (id, updates) => {
+      let touchedTimeboxId = null
+      setPlanSprints((prev) => {
+        const nextSprints = prev.map((s) => {
+          if (s.id !== id) return s
+          touchedTimeboxId = s.timeboxId
+          const start = updates.startDate ?? s.startDate
+          const weeks = updates.weekCount ?? s.weekCount
+          const endDate = updates.endDate ?? addDays(start, weeks * 7 - 1)
+          return {
+            ...s,
+            ...updates,
+            startDate: start,
+            weekCount: weeks,
+            endDate,
+            name: updates.name?.trim?.() ?? s.name,
+            type: updates.type?.trim?.() || s.type,
+            scale: updates.scale ?? s.scale,
+          }
+        })
+        if (touchedTimeboxId) {
+          const siblings = nextSprints.filter((s) => s.timeboxId === touchedTimeboxId)
+          const dates = deriveTimeboxDates(siblings)
+          setTimeboxes((tbs) =>
+            tbs.map((t) => (t.id === touchedTimeboxId ? { ...t, ...dates } : t)),
+          )
+        }
+        return nextSprints
+      })
+      addAuditEvent(createEvent('sprint.updated', actor, null, { id, ...updates }))
+    },
+    [actor, addAuditEvent],
+  )
+
+  const getDefaultFeatureDates = useCallback(
+    () => getDefaultFeatureDatesFromPlan(timeboxesForActivePlan),
+    [timeboxesForActivePlan],
+  )
+
+  const currentTimebox = useMemo(
+    () => findCurrentTimebox(timeboxesForActivePlan),
+    [timeboxesForActivePlan],
+  )
 
   return {
     actor,
@@ -992,6 +1271,13 @@ export function useTimelineState() {
     productsForProject,
     teamsForProject,
     orphanedProducts,
+    iterationPlans,
+    timeboxes,
+    planSprints,
+    projectIterationPlans,
+    projectCalendar,
+    activePlan,
+    currentTimebox,
     projectId,
     setProjectId,
     activeProject,
@@ -1037,6 +1323,7 @@ export function useTimelineState() {
     renameProject,
     deleteProject,
     setProjectTeamIds,
+    setProjectIterationPlan,
     createTeam,
     renameTeam,
     deleteTeam,
@@ -1048,8 +1335,16 @@ export function useTimelineState() {
     setProductProjectIds,
     assignProductToProject,
     unassignProductFromProject,
+    createIterationPlan,
+    renameIterationPlan,
+    deleteIterationPlan,
+    createTimebox,
+    updateTimebox,
+    deleteTimebox,
+    updateSprint,
     resetToSeed,
-    currentPiId: CURRENT_PI_ID,
+    currentPiId: currentTimebox?.id ?? null,
     getDefaultFeatureDates,
   }
 }
+

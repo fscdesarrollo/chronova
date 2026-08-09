@@ -6,8 +6,7 @@ import {
   WEEK_WIDTH,
   clampWeek,
 } from '../constants'
-import { TOTAL_WEEKS, weekCalendar } from '../data'
-import { weekIndexToDates } from '../utils/weekCalendar'
+import { unitIndexFromPixel, weekIndexToDates } from '../utils/weekCalendar'
 import {
   rowHeightFor,
   visualRowIndexFromY,
@@ -18,21 +17,19 @@ const DRAG_THRESHOLD = 4
 const BAR_HEIGHT = 28
 const RESIZE_HANDLE_WIDTH = 8
 
-function barWidthPx(duration) {
-  return duration * WEEK_WIDTH - BAR_PADDING * 2
+function unitsWidth(weeks, startIdx, endIdx) {
+  let width = 0
+  for (let i = startIdx; i <= endIdx; i += 1) {
+    width += weeks[i]?.width ?? WEEK_WIDTH
+  }
+  return width
 }
 
-function barLeftPx(startWeek) {
-  return startWeek * WEEK_WIDTH + BAR_PADDING
-}
-
-function clampVisualRow(row, rowCount) {
-  return Math.max(0, Math.min(row, rowCount - 1))
-}
-
-function barFixedStyle(rects, startWeek, visualRowIndex, duration, timelineRows, leftColWidth) {
+function barFixedStyle(rects, startWeek, endWeek, visualRowIndex, timelineRows, leftColWidth, weeks) {
   const rowTop = visualRowTop(timelineRows, visualRowIndex)
-  const left = rects.gridRect.left + leftColWidth + barLeftPx(startWeek) - rects.scrollLeft
+  const barLeft = weeks[startWeek]?.left ?? startWeek * WEEK_WIDTH
+  const barWidth = Math.max(4, unitsWidth(weeks, startWeek, endWeek) - BAR_PADDING * 2)
+  const left = rects.gridRect.left + leftColWidth + barLeft + BAR_PADDING - rects.scrollLeft
   const top =
     rects.gridRect.top +
     rects.rowsOffsetTop +
@@ -44,7 +41,7 @@ function barFixedStyle(rects, startWeek, visualRowIndex, duration, timelineRows,
     position: 'fixed',
     left,
     top,
-    width: barWidthPx(duration),
+    width: barWidth,
     height: BAR_HEIGHT,
     zIndex: 9999,
   }
@@ -59,11 +56,18 @@ function getDragMode(e, barElement) {
   return 'bar'
 }
 
-export function useFeatureDrag(timelineRows, onMove, leftColWidth = LEFT_COL_WIDTH) {
+function clampVisualRow(row, rowCount) {
+  return Math.max(0, Math.min(row, rowCount - 1))
+}
+
+export function useFeatureDrag(timelineRows, onMove, leftColWidth = LEFT_COL_WIDTH, calendar) {
   const gridRef = useRef(null)
   const rowsRef = useRef(null)
   const pendingRef = useRef(null)
   const [drag, setDrag] = useState(null)
+
+  const weekCalendar = calendar?.weeks ?? []
+  const totalWeeks = calendar?.totalWeeks ?? 0
 
   const featureRows = timelineRows.filter((r) => r.type === 'feature')
   const rowCount = timelineRows.length
@@ -108,9 +112,8 @@ export function useFeatureDrag(timelineRows, onMove, leftColWidth = LEFT_COL_WID
         }
       }
 
-      const pointerWeek = Math.round(
-        (clientX - rects.timelineLeft + rects.scrollLeft - BAR_PADDING) / WEEK_WIDTH,
-      )
+      const px = clientX - rects.timelineLeft + rects.scrollLeft - BAR_PADDING
+      const pointerWeek = unitIndexFromPixel(weekCalendar, px)
 
       if (mode === 'row') {
         const targetRow = pointerYToVisualRow(clientY)
@@ -129,16 +132,18 @@ export function useFeatureDrag(timelineRows, onMove, leftColWidth = LEFT_COL_WID
 
       if (mode === 'resize-end') {
         const startWeek = origin.originStartWeek
-        const endWeek = Math.max(startWeek, Math.min(pointerWeek, TOTAL_WEEKS - 1))
+        const endWeek = Math.max(startWeek, Math.min(pointerWeek, Math.max(0, totalWeeks - 1)))
         return { startWeek, endWeek, visualRowIndex: origin.originVisualRowIndex }
       }
 
-      const deltaWeeks = Math.round((clientX - origin.startClientX) / WEEK_WIDTH)
+      const originPx = origin.startClientX - rects.timelineLeft + rects.scrollLeft - BAR_PADDING
+      const originUnit = unitIndexFromPixel(weekCalendar, originPx)
+      const deltaUnits = pointerWeek - originUnit
       const targetRow = pointerYToVisualRow(clientY)
       const startWeek = clampWeek(
-        origin.originStartWeek + deltaWeeks,
+        origin.originStartWeek + deltaUnits,
         duration,
-        TOTAL_WEEKS,
+        totalWeeks,
       )
       return {
         startWeek,
@@ -146,7 +151,7 @@ export function useFeatureDrag(timelineRows, onMove, leftColWidth = LEFT_COL_WID
         visualRowIndex: clampVisualRow(targetRow, rowCount),
       }
     },
-    [getRects, pointerYToVisualRow, rowCount],
+    [getRects, pointerYToVisualRow, rowCount, totalWeeks, weekCalendar],
   )
 
   const beginDrag = useCallback(
@@ -196,15 +201,16 @@ export function useFeatureDrag(timelineRows, onMove, leftColWidth = LEFT_COL_WID
           ? barFixedStyle(
               rects,
               snap.startWeek,
+              snap.endWeek,
               snap.visualRowIndex,
-              duration,
               timelineRows,
               leftColWidth,
+              weekCalendar,
             )
           : null,
       }
     },
-    [computeSnap, getRects, leftColWidth, timelineRows],
+    [computeSnap, getRects, leftColWidth, timelineRows, weekCalendar],
   )
 
   useEffect(() => {
@@ -277,9 +283,9 @@ export function useFeatureDrag(timelineRows, onMove, leftColWidth = LEFT_COL_WID
       window.removeEventListener('pointerup', finishDrag)
       window.removeEventListener('pointercancel', finishDrag)
     }
-  }, [drag, onMove, buildDragState])
+  }, [drag, onMove, buildDragState, weekCalendar])
 
   return { gridRef, rowsRef, drag, beginDrag, BAR_HEIGHT }
 }
 
-export { LEFT_COL_WIDTH, ROW_HEIGHT, TOTAL_WEEKS, WEEK_WIDTH, BAR_HEIGHT }
+export { LEFT_COL_WIDTH, ROW_HEIGHT, WEEK_WIDTH, BAR_HEIGHT }

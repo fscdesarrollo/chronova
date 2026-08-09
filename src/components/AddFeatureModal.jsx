@@ -14,7 +14,6 @@ export default function AddFeatureModal({
   const [name, setName] = useState('')
   const [teamId, setTeamId] = useState(BACKLOG_VALUE)
   const [productId, setProductId] = useState(products[0]?.id ?? '')
-  const [customId, setCustomId] = useState('')
   const [startDate, setStartDate] = useState('')
   const [targetDate, setTargetDate] = useState('')
   const [error, setError] = useState('')
@@ -24,7 +23,6 @@ export default function AddFeatureModal({
   useEffect(() => {
     if (!open) return
     setName('')
-    setCustomId('')
     setTeamId(BACKLOG_VALUE)
     setProductId(products[0]?.id ?? '')
     setStartDate('')
@@ -74,7 +72,6 @@ export default function AddFeatureModal({
       name: name.trim(),
       teamId: isBacklog ? null : teamId,
       productId,
-      id: customId.trim() || undefined,
       startDate: startDate || null,
       targetDate: targetDate || null,
     })
@@ -138,17 +135,6 @@ export default function AddFeatureModal({
                 ))}
               </select>
             </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">ID (optional)</label>
-            <input
-              type="text"
-              value={customId}
-              onChange={(e) => setCustomId(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-              placeholder="Auto-generated (e.g. F-1042)"
-            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

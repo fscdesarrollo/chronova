@@ -177,7 +177,6 @@ export default function ProductsPage({
 
   return (
     <div className="flex-1 overflow-y-auto bg-white p-6">
-      <h1 className="mb-1 text-xl font-semibold text-gray-900">Products</h1>
       <p className="mb-6 text-sm text-gray-500">
         Global product catalog. Assign products to one or more projects.
       </p>

@@ -127,11 +127,11 @@ Project: CARB Platform
 ├── Product A (#3B82F6)   → identification label, shared across teams
 ├── Product B (#10B981)
 ├── Backlog (no team)
-│   └── F-1099, F-1100...   → no Gantt bar
+│   └── 9, 10...   → no Gantt bar
 ├── Team: CARB Data Platform
-│   └── F-1042, F-1087...
+│   └── 1, 2...
 └── Team: API Integration
-    └── F-1201, F-1205...
+    └── 16, 17...
 ```
 
 **Product semantics:** a Product is a lightweight global identification label (name + color) for visual grouping on the Gantt. Products are assigned to projects via `project_products` — the same product may appear in multiple projects. It is **not** an epic or parent work item in a backlog tree.
@@ -139,6 +139,27 @@ Project: CARB Platform
 **Hierarchy:** Project → (Backlog | Team) → Feature, with Product as a cross-cutting visual identifier assigned to projects.
 
 Rejected alternatives: timeline per product (fragments the view), timeline per full ART (too noisy for executives), team as the top-level unit (does not reflect multi-team projects).
+
+#### Iterations (calendar plans) — Phase A
+
+Reusable **iteration plans** define the timeline calendar. Methodology-neutral naming in the UI (**Iterations**); SAFe vocabulary appears inside a plan when `methodology = safe`.
+
+| Entity | Role |
+|--------|------|
+| **Iteration plan** | Named calendar configuration (`methodology: safe` for now); shared across projects |
+| **Timebox / iteration** | Program Increment within a plan (name + date range); created via **Create iteration** |
+| **Sprint** | Child of a timebox (editable name, free-text type, dates, week count, **timeline scale**) |
+| **project_iteration_plans** | Each project has **exactly one** plan; assignment is configured only on the **Projects** page |
+
+**SAFe template (v1):** creating an iteration from a start date generates 4 sprints (3+3+3+4 weeks). Sprint fields are editable afterward; timebox start/end are derived from its sprints.
+
+**Sprint timeline scale:** each sprint chooses the Gantt leaf unit — `day`, `week` (default), or `month`. Example: Sprint `26.2.1` with scale `week` shows `Week 1…` columns; with scale `day` shows one column per day. Mixed scales across sprints in the same plan are supported.
+
+**Current timebox:** automatic — the timebox that contains **today**; if none, the first future timebox. Used for Add Feature default dates.
+
+**Pages:** sidebar **Iterations** (CRUD plans / iterations / sprints; read-only list of projects using the plan). **Projects** assigns the plan. Timeline top bar shows `Plan: {name}` only on the Timeline page.
+
+**UI chrome:** management pages use a single title in the top bar (no duplicate in-page H1). Current/Baseline toggle is removed; the app always shows the current plan view.
 
 #### Planning status and assignment status
 
@@ -220,7 +241,7 @@ A **feature** is the smallest plannable unit. Planned features appear on the Gan
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| ID | Yes | Unique identifier (e.g. `F-1042`) |
+| ID | Yes | Auto-generated integer identity (1, 2, 3…); assigned on save. Frontend generates locally until backend returns DB identity. |
 | Name | Yes | Descriptive title; editable after creation |
 | Project | Yes | Parent project |
 | Product | Yes | Product from project catalog (`project_products`); determines bar color |
@@ -279,9 +300,10 @@ Features are created via a **simple modal** opened from the **"Add Feature"** bu
 | Name | Yes | — | Descriptive title |
 | Team | No | — | Dropdown from teams assigned to the active project; **"Unassigned (backlog)"** option creates a backlog feature |
 | Product | Yes | — | Dropdown from the active project's products; determines bar color |
-| ID | No | Auto-generated | Format `F-{number}` (e.g. `F-1042`); user can override |
 | Start date | No (backlog) / Yes (planned) | Empty (backlog) or first day of current PI (planned) | Optional for backlog; required when saving with a team; may be cleared on edit — feature stays on Gantt without bar |
 | Target date | No (backlog) / Yes (planned) | Empty (backlog) or start + 1 week (planned) | Must be ≥ start date when both are set |
+
+**ID:** not user-editable. Assigned automatically when the feature is saved (`max(existing ids) + 1` in the frontend). When a backend is integrated, the API will return the database identity instead.
 
 **Date rules (MVP 1.7):**
 
@@ -341,7 +363,7 @@ Features can declare **depends on** relationships to other features in the same 
 
 | Aspect | Behavior |
 |--------|----------|
-| Model | `dependsOn: string[]` — feature IDs this feature depends on (unidirectional) |
+| Model | `dependsOn: number[]` — feature IDs this feature depends on (unidirectional) |
 | Scope | Same project; may cross teams |
 | Configuration | Multi-select in detail panel |
 | Validation | No self-reference; no cycles |
@@ -452,7 +474,8 @@ The left sidebar is the app navigation hub. It can be collapsed (icons only + to
 
 | Section | Content |
 |---------|---------|
-| **Timeline** | Main Gantt view (default page) |
+| **Home** | Brand landing page (default on app open): hero, pillars, CTAs to Timeline and Projects |
+| **Timeline** | Main Gantt view |
 | **Projects** | Project list + CRUD (create, rename, delete) |
 | **Teams** | Global team registry + CRUD + assign/unassign to projects |
 | **Products** | Global product catalog + CRUD + color picker + project assignment |
@@ -473,8 +496,9 @@ State model: `viewMode: 'all' | 'backlog' | 'team'` + `filterTeamId` when `viewM
 
 | Screen / area | Content |
 |---------------|---------|
-| Sidebar | Collapsible navigation + active project selector + **View** filter |
-| Top bar | Project name, PI range label, Current/Baseline toggle, **Gantt settings** icon, **Add Feature** button |
+| Sidebar | Collapsible navigation: **Home**, Timeline, Projects, **Iterations**, Teams, Products + active project + **View** filter (Timeline only) |
+| Top bar | Page title; on Timeline only: `Plan: {name}`; **Gantt settings** + **Add Feature** (Timeline only). Dark variant on Home. Current/Baseline toggle removed. |
+| Home | Dark futuristic hero (`TimeHorizon` animation): brand copy, See / Preserve / Adapt pillars, **Open Timeline** + **Configure project** CTAs |
 | Gantt settings | Gear icon in top bar; modal with **Markers** and **Rules** (editable condition/action builder) tabs |
 | Add Feature modal | Backlog: empty dates default; planned: team + PI-pre-filled dates required |
 | Feature panel | **Collapse all** / **Expand all**; collapsible section headers |
@@ -567,7 +591,7 @@ Displayed when dates differ from baseline and a baseline exists for the feature.
 
 ```json
 {
-  "featureId": "F-1042",
+  "featureId": 1,
   "baseline": {
     "startDate": "2026-05-08",
     "targetDate": "2026-06-20",
@@ -650,6 +674,7 @@ All data lives in the browser until MVP 3 adds a backend:
 | Concern | Approach |
 |---------|----------|
 | Projects, teams, project_teams, products, project_products | Serialized to `localStorage` |
+| Iteration plans, timeboxes, sprints, project_iteration_plans | Serialized to `localStorage` |
 | Features, US, baselines | Serialized to `localStorage` |
 | Audit events | Appended in `localStorage` (same structure as future DB model) |
 | Actor name | `localStorage` key `chronova-actor` |
@@ -659,10 +684,10 @@ All data lives in the browser until MVP 3 adds a backend:
 | Rules | Per-project rules (`formattingRules` in main state; UI label **Rules**) |
 | View filter | `viewMode` (`all` \| `backlog` \| `team`) + `filterTeamId` when team view |
 | Collapsed sections | Per-project section collapse state (`collapsedSections` in main state) |
-| PI/sprint calendar | Static seed data in code; dynamic weeks when unconfigured |
+| PI/sprint calendar | Derived from the project's assigned iteration plan |
 | Multi-user sharing | Not supported — each browser has its own copy |
 
-**Migration:** `loadState()` migrates legacy data (team-only model) by creating a default project and assigning `projectId` to existing features and products. MVP 1.7 adds migration from `teamViewMode` → `viewMode` and initializes `collapsedSections` per project when absent.
+**Migration:** `loadState()` migrates legacy data (team-only model) by creating a default project and assigning `projectId` to existing features and products. MVP 1.7 adds migration from `teamViewMode` → `viewMode` and initializes `collapsedSections` per project when absent. Feature ids migrate from legacy `F-{n}` strings to integer identity values; `dependsOn` and audit `featureId` references are remapped. Missing iteration plans are seeded from the default SAFe calendar and assigned to all projects.
 
 This keeps data shapes aligned with the [future data model](#data-model-future-mvp) so migration to a backend later is straightforward.
 
@@ -690,8 +715,12 @@ docs/             Project documentation
   "projectTeams": [{ "projectId": "proj-carb", "teamId": "carb-dp" }],
   "products": [{ "id": "prod-a", "name": "Product A", "color": "#3B82F6" }],
   "projectProducts": [{ "projectId": "proj-carb", "productId": "prod-a" }],
+  "iterationPlans": [{ "id": "plan-carb-2026", "name": "CARB ART 2026", "methodology": "safe" }],
+  "timeboxes": [{ "id": "26.3", "planId": "plan-carb-2026", "name": "PI 26.3", "startDate": "2026-08-05", "endDate": "2026-11-03", "sortOrder": 1 }],
+  "sprints": [{ "id": "26.3.1", "timeboxId": "26.3", "number": 1, "name": "26.3.1", "type": "development", "startDate": "2026-08-05", "endDate": "2026-08-25", "weekCount": 3 }],
+  "projectIterationPlans": [{ "projectId": "proj-carb", "planId": "plan-carb-2026" }],
   "features": [{
-    "id": "F-1042",
+    "id": 1,
     "projectId": "proj-carb",
     "teamId": "carb-dp",
     "productId": "prod-a",
@@ -702,7 +731,7 @@ docs/             Project documentation
     "targetDate": "2026-06-20",
     "storyPoints": 13,
     "notes": "",
-    "dependsOn": ["F-1030"],
+    "dependsOn": [3],
     "comments": [{
       "id": "c-1",
       "author": "Franklin",
@@ -798,33 +827,53 @@ Composite primary key: `(project_id, team_id)`.
 
 Composite primary key: `(project_id, product_id)`. A product may be assigned to multiple projects.
 
-### `program_increments`
+### `iteration_plans`
 
 | Column | Type | Notes |
 |--------|------|-------|
-| id | text | Primary key (e.g. `26.2`) |
+| id | text | Primary key (e.g. `plan-1`) |
+| name | text | Display name (e.g. `CARB ART 2026`) |
+| methodology | text | `safe` (v1); future methodologies allowed |
+| created_at | text | ISO timestamp |
+
+### `project_iteration_plans`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| project_id | text | FK → projects (unique — one plan per project) |
+| plan_id | text | FK → iteration_plans |
+
+### `program_increments` (timeboxes)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | text | Primary key |
+| plan_id | text | FK → iteration_plans |
 | name | text | Display name (e.g. `PI 26.2`) |
 | start_date | text | ISO date |
 | end_date | text | ISO date |
+| sort_order | integer | Display order within plan |
 | holiday_count | integer | Optional; informational only |
 
 ### `sprints`
 
 | Column | Type | Notes |
 |--------|------|-------|
-| id | text | Primary key (e.g. `26.2.1`) |
-| pi_id | text | FK → program_increments |
-| number | integer | 1–4 |
-| type | text | `development`, `innovation`, `planning` (week 4 of IP) |
+| id | text | Primary key |
+| timebox_id | text | FK → program_increments |
+| number | integer | 1–4 for SAFe |
+| name | text | Display name (e.g. `26.2.1`) |
+| type | text | Free text (defaults `DEVELOPMENT` / `INNOVATION` from SAFe template) |
+| scale | text | `day` \| `week` \| `month` — Gantt leaf granularity for this sprint |
 | start_date | text | ISO date |
 | end_date | text | ISO date |
-| week_count | integer | 3 or 1 (planning week stored separately if needed) |
+| week_count | integer | Weeks in the sprint (used for SAFe date span) |
 
 ### `features`
 
 | Column | Type | Notes |
 |--------|------|-------|
-| id | text | Primary key (e.g. `F-1042`) |
+| id | integer | Primary key; auto-increment identity (1, 2, 3…) |
 | project_id | text | FK → projects |
 | team_id | text | FK → teams; nullable when `planning_status = backlog` |
 | product_id | text | FK → products |
@@ -847,8 +896,8 @@ Composite primary key: `(project_id, product_id)`. A product may be assigned to 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | integer | Primary key |
-| feature_id | text | FK → features (dependent) |
-| depends_on_id | text | FK → features (predecessor) |
+| feature_id | integer | FK → features (dependent) |
+| depends_on_id | integer | FK → features (predecessor) |
 | created_at | text | ISO timestamp |
 
 Unique constraint: `(feature_id, depends_on_id)`.
@@ -858,7 +907,7 @@ Unique constraint: `(feature_id, depends_on_id)`.
 | Column | Type | Notes |
 |--------|------|-------|
 | id | text | Primary key |
-| feature_id | text | FK → features |
+| feature_id | integer | FK → features |
 | author | text | Actor display name |
 | text | text | Comment body (max 500 chars) |
 | created_at | text | ISO timestamp |
@@ -883,7 +932,7 @@ Unique constraint: `(feature_id, depends_on_id)`.
 | Column | Type | Notes |
 |--------|------|-------|
 | id | integer | Primary key |
-| feature_id | text | FK → features |
+| feature_id | integer | FK → features |
 | start_date | text | Frozen start date |
 | target_date | text | Frozen target date |
 | frozen_at | text | ISO timestamp |
@@ -894,7 +943,7 @@ Unique constraint: `(feature_id, depends_on_id)`.
 | Column | Type | Notes |
 |--------|------|-------|
 | id | integer | Primary key |
-| feature_id | text | FK → features |
+| feature_id | integer | FK → features |
 | title | text | US title |
 | story_points | integer | Points for this US |
 | sort_order | integer | Display order |
@@ -905,7 +954,7 @@ Unique constraint: `(feature_id, depends_on_id)`.
 | Column | Type | Notes |
 |--------|------|-------|
 | id | integer | Primary key |
-| feature_id | text | FK → features (nullable for PI-wide events) |
+| feature_id | integer | FK → features (nullable for PI-wide events) |
 | event_type | text | e.g. `feature.moved`, `baseline.frozen` |
 | actor | text | Display name |
 | reason | text | Nullable; required on move (TBD) |
@@ -951,7 +1000,7 @@ These were not explicitly discussed but are assumed unless changed:
 | Left column width | Default 280px; min 200px, max 720px; collapsed 52px; persisted in `localStorage` |
 | Sidebar | Collapsible; state persisted |
 | Move reason | **TBD (MVP 2)** — required or optional |
-| Date granularity on Gantt | Week-level positioning; day is display-only |
+| Date granularity on Gantt | Per-sprint leaf scale (`day` \| `week` \| `month`); feature dates remain ISO source of truth |
 | PI display | Continuous horizontal scroll; dynamic weeks when no PI configured |
 | Re-freeze individual baseline | **TBD (MVP 2)** |
 | Recent history in panel | Last 20 events per feature |
@@ -989,7 +1038,7 @@ What the codebase already validates:
 | Timeline scroll position memory | Done — per project, on timeline exit |
 | Plan markers (Gantt settings) | Done |
 | Drag → team reassignment | Done |
-| Dynamic week calendar | **Not started** |
+| Dynamic week calendar | Phase A done (from iteration plan); infinite empty scroll deferred |
 | MVP 1.6 (backlog, comments, rules, dependencies) | Done |
 | MVP 1.7 (dates UX, View, collapsible sections, rule builder) | Done |
 | Baseline / ghost bars / functional history | MVP 2 (blocked on MVP 1.7) |
@@ -1032,11 +1081,11 @@ Application structure, navigation, and organizational model. Builds on MVP 1.
 | 9 | **Products per project** | Global product catalog; assigned to projects via `project_products`; shared across teams |
 | 10 | **Product CRUD + color picker** | Create, rename, recolor (hex + native picker); delete blocked if features exist |
 | 11 | **Orphaned products** | On empty project delete, products become `project_unassigned` |
-| 12 | **Collapsible sidebar navigation** | Pages: Timeline, Projects, Teams, Products |
+| 12 | **Collapsible sidebar navigation** | Pages: Timeline, Projects, Iterations, Teams, Products |
 | 13 | **Resizable feature panel** | Left Gantt column draggable; width persisted in `localStorage` |
 | 14 | **Full feature name visibility** | Names expand as panel widens; no truncate-only when space allows |
 | 15 | **Edit feature name** | Editable in detail panel; immediate update in list and bar |
-| 16 | **Dynamic week calendar** | PIs/Sprints in header; dynamic weeks when no PI configured |
+| 16 | **Dynamic week calendar** | **Phase A done** — calendar from assigned iteration plan; infinite empty scroll still deferred |
 | 17 | **Today marker** | **TODAY** pill in shared header row + vertical line at current day; not editable |
 | 18 | **Timeline scroll memory** | Per-project scroll saved on leaving Timeline (not F5); Today-centered default |
 | 19 | **Plan markers** | Gantt Settings modal; per-project markers (date, label, color); scroll on create |
@@ -1097,13 +1146,14 @@ Features identified but **not** in MVP 1.6. Ordered by priority.
 
 | Priority | Feature | Description | Rationale |
 |----------|---------|-------------|-----------|
-| 1 | **Delivery commitment (star)** | Optional flag: "Product delivery date". Star icon at target date on the bar. Toggle in create modal and detail panel. | Core Excel convention; communicates executive delivery commitment. |
-| 2 | **Bar labels and hover** | Feature name truncated inside bar; hover shows start date, target date, and notes preview. | Visual polish; complements notes and dates already on features. |
-| 3 | **Filter: delivery commitments** | Toggle or filter to show only features with delivery star. | Useful once delivery commitment exists; depends on priority 1. |
-| 4 | **Milestone types / icons** | Optional icon or type per marker (planning, release, regulatory, etc.). | Clarifies marker meaning; build after basic markers work. |
-| 5 | **Dependency SVG connectors** | Curved lines between related bars on feature select | Deferred from MVP 1.6; highlight + list is sufficient for v1 |
-| 6 | **Gantt settings expansion** | Additional tabs (filters, export prefs, etc.) | Extensible shell already in place |
-| 7 | **Formatting rule preview** | "Matches N features" preview in rule builder | Deferred from MVP 1.7 |
+| 1 | **Gantt zoom UX polish** | Global scale control / denser day layout; per-sprint scale already supported | Optional enhancement on top of per-sprint `scale` |
+| 2 | **Delivery commitment (star)** | Optional flag: "Product delivery date". Star icon at target date on the bar. Toggle in create modal and detail panel. | Core Excel convention; communicates executive delivery commitment. |
+| 3 | **Bar labels and hover** | Feature name truncated inside bar; hover shows start date, target date, and notes preview. | Visual polish; complements notes and dates already on features. |
+| 4 | **Filter: delivery commitments** | Toggle or filter to show only features with delivery star. | Useful once delivery commitment exists; depends on priority 2. |
+| 5 | **Milestone types / icons** | Optional icon or type per marker (planning, release, regulatory, etc.). | Clarifies marker meaning; build after basic markers work. |
+| 6 | **Dependency SVG connectors** | Curved lines between related bars on feature select | Deferred from MVP 1.6; highlight + list is sufficient for v1 |
+| 7 | **Gantt settings expansion** | Additional tabs (filters, export prefs, etc.) | Extensible shell already in place |
+| 8 | **Formatting rule preview** | "Matches N features" preview in rule builder | Deferred from MVP 1.7 |
 
 **Explicitly not planned:**
 
@@ -1245,3 +1295,6 @@ Build on MVP 1.5 without adding a backend:
 | 2026-08-08 | Detail panel: explicit Save with draft state; unsaved-changes dialog; team/dates validated on save |
 | 2026-08-08 | Rules UX polish: tab renamed to Rules; AND/OR matchMode; all rules deletable; row-icon tooltips; alert-triangle fix; marker group expand shows popover only |
 | 2026-08-08 | MVP 1.7 implemented: dates UX, View filter, collapsible sections, rule builder, Completed overdue rule; MVP 1.7 marked complete |
+| 2026-08-08 | Feature ID: auto-generated integer identity on save; custom ID input removed; legacy `F-*` migrated |
+| 2026-08-08 | **Iterations Phase A:** reusable iteration plans (SAFe PIs/sprints); one plan per project; timeline calendar derived from plan; current timebox = contains today |
+| 2026-08-08 | Iterations UX: project assign only on Projects; Create iteration; sprint name/type/scale (day/week/month); remove Current/Baseline + breadcrumb; Plan label on Timeline; single page titles |

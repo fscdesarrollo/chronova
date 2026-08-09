@@ -1,6 +1,5 @@
 import { Check, GripVertical, Layers, AlertTriangle, CalendarOff, StickyNote, MessageSquare, Clock, Link2 } from 'lucide-react'
 import { BAR_PADDING } from '../constants'
-import { TOTAL_WEEKS } from '../data'
 import { ROW_HEIGHT, WEEK_WIDTH } from '../hooks/useFeatureDrag'
 import { formatDay } from '../utils/dates'
 import { textColorForBg } from '../utils/colors'
@@ -217,23 +216,26 @@ export function FeatureBarRow({
   isDimmed = false,
   dragStyle,
   formatting,
+  totalWidth = 0,
+  units = [],
   onBarPointerDown,
   onSelect,
 }) {
+  const timelineWidth = totalWidth || units.reduce((s, u) => s + (u.width ?? WEEK_WIDTH), 0)
+
   if (!feature.onGantt) {
     return (
       <div
         className={`relative shrink-0 border-b border-gray-100 bg-gray-50/30 ${
           isSelected ? 'bg-violet-50/30' : ''
         } ${isDimmed ? 'opacity-25' : ''}`}
-        style={{ height: ROW_HEIGHT, width: TOTAL_WEEKS * WEEK_WIDTH }}
+        style={{ height: ROW_HEIGHT, width: timelineWidth }}
       />
     )
   }
 
-  const barW = feature.duration * WEEK_WIDTH - BAR_PADDING * 2
-  const barL = feature.startWeek * WEEK_WIDTH + BAR_PADDING
-  const timelineWidth = TOTAL_WEEKS * WEEK_WIDTH
+  const barW = Math.max(4, (feature.barWidth || feature.duration * WEEK_WIDTH) - BAR_PADDING * 2)
+  const barL = (feature.barLeft ?? feature.startWeek * WEEK_WIDTH) + BAR_PADDING
   const barTextColor = textColorForBg(feature.color)
   const fmt = formatting ?? evaluateFormattingRules([], feature)
   const showSpOnBar = barW >= 120 && feature.storyPoints > 0
@@ -275,11 +277,17 @@ export function FeatureBarRow({
       style={{ height: ROW_HEIGHT, width: timelineWidth }}
     >
       <div className="absolute inset-0 flex">
-        {Array.from({ length: TOTAL_WEEKS }).map((_, i) => (
+        {(units.length
+          ? units
+          : Array.from({ length: Math.max(1, Math.round(timelineWidth / WEEK_WIDTH)) }, (_, i) => ({
+              index: i,
+              width: WEEK_WIDTH,
+            }))
+        ).map((unit) => (
           <div
-            key={i}
+            key={unit.index}
             className="h-full border-r border-dotted border-gray-200"
-            style={{ width: WEEK_WIDTH }}
+            style={{ width: unit.width ?? WEEK_WIDTH }}
           />
         ))}
       </div>

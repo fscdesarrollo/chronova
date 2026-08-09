@@ -10,12 +10,13 @@ import ActorSetup from './components/ActorSetup'
 import ProjectsPage from './components/pages/ProjectsPage'
 import TeamsPage from './components/pages/TeamsPage'
 import ProductsPage from './components/pages/ProductsPage'
+import IterationsPage from './components/pages/IterationsPage'
+import HomePage from './components/pages/HomePage'
 import { PAGE_TITLES } from './brand'
 import { useTimelineState } from './hooks/useTimelineState'
 
 export default function App() {
-  const [viewMode, setViewMode] = useState('current')
-  const [currentPage, setCurrentPage] = useState('timeline')
+  const [currentPage, setCurrentPage] = useState('home')
   const timeline = useTimelineState()
   const detailPanelRef = useRef(null)
 
@@ -57,12 +58,22 @@ export default function App() {
 
   const renderMainContent = () => {
     switch (currentPage) {
+      case 'home':
+        return (
+          <HomePage
+            activeProject={timeline.projects.find((p) => p.id === timeline.projectId)}
+            onOpenTimeline={() => setCurrentPage('timeline')}
+            onConfigureProject={() => setCurrentPage('projects')}
+          />
+        )
       case 'projects':
         return (
           <ProjectsPage
             projects={timeline.projects}
             teams={timeline.teams}
             projectTeams={timeline.projectTeams}
+            iterationPlans={timeline.iterationPlans}
+            projectIterationPlans={timeline.projectIterationPlans}
             features={timeline.allFeatures}
             projectId={timeline.projectId}
             onSelectProject={timeline.setProjectId}
@@ -70,6 +81,23 @@ export default function App() {
             onRename={timeline.renameProject}
             onDelete={timeline.deleteProject}
             onSetProjectTeams={timeline.setProjectTeamIds}
+            onSetProjectIterationPlan={timeline.setProjectIterationPlan}
+          />
+        )
+      case 'iterations':
+        return (
+          <IterationsPage
+            iterationPlans={timeline.iterationPlans}
+            timeboxes={timeline.timeboxes}
+            sprints={timeline.planSprints}
+            projects={timeline.projects}
+            projectIterationPlans={timeline.projectIterationPlans}
+            onCreatePlan={timeline.createIterationPlan}
+            onRenamePlan={timeline.renameIterationPlan}
+            onDeletePlan={timeline.deleteIterationPlan}
+            onCreateTimebox={timeline.createTimebox}
+            onDeleteTimebox={timeline.deleteTimebox}
+            onUpdateSprint={timeline.updateSprint}
           />
         )
       case 'teams':
@@ -109,6 +137,7 @@ export default function App() {
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
               <TimelineGrid
                 projectId={timeline.projectId}
+                calendar={timeline.projectCalendar}
                 timelineRows={timeline.timelineRows}
                 allFeatures={timeline.allFeatures}
                 markers={timeline.markersForProject}
@@ -188,9 +217,9 @@ export default function App() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopNav
           pageTitle={PAGE_TITLES[currentPage] ?? 'Timeline'}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          projectName={timeline.activeProject?.name}
+          planLabel={timeline.activePlan?.name}
+          showPlanLabel={currentPage === 'timeline'}
+          variant={currentPage === 'home' ? 'dark' : 'light'}
           onAddFeature={() => requestProtectedAction(() => timeline.setShowAddModal(true))}
           onOpenGanttSettings={() => requestProtectedAction(() => timeline.setShowGanttSettings(true))}
           showAddFeature={currentPage === 'timeline'}

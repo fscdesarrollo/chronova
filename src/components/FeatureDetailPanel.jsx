@@ -1,16 +1,43 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Check, Clock, Link2, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, Clock, Link2, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { formatDay } from '../utils/dates'
 import {
   featuresForDependencyPicker,
   getDependencyDateConflicts,
   hasDependencyCycle,
   normalizeDependsOn,
+  sameFeatureId,
   wouldCreateDependencyCycle,
 } from '../utils/dependencies'
+import { parseFeatureId } from '../utils/ids'
 import UnsavedChangesDialog from './UnsavedChangesDialog'
 
 const BACKLOG_VALUE = '__backlog__'
+
+function CollapsibleSection({ title, icon: Icon, count, defaultOpen = true, children }) {
+  const [open, setOpen] = useState(defaultOpen)
+
+  return (
+    <section className="border-b border-gray-100 pb-4 last:border-b-0">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="mb-3 flex w-full items-center justify-between text-left"
+      >
+        <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
+          {Icon && <Icon size={12} />}
+          {title}
+          {count != null && <span className="font-normal normal-case text-gray-400">({count})</span>}
+        </h3>
+        <ChevronDown
+          size={14}
+          className={`text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {open && children}
+    </section>
+  )
+}
 
 const EVENT_LABELS = {
   'feature.created': 'Feature created',
@@ -59,7 +86,7 @@ function draftsEqual(a, b) {
     a.completed === b.completed &&
     a.notes === b.notes &&
     a.dependsOn.length === b.dependsOn.length &&
-    a.dependsOn.every((id, i) => id === b.dependsOn[i])
+    a.dependsOn.every((id, i) => sameFeatureId(id, b.dependsOn[i]))
   )
 }
 
@@ -245,9 +272,32 @@ const FeatureDetailPanel = forwardRef(function FeatureDetailPanel(
   const depPickerFeatures = featuresForDependencyPicker(feature.projectId, feature.id, allFeatures ?? [])
   const depConflicts = getDependencyDateConflicts(draftFeature, allFeatures ?? [])
   const predecessors = draft.dependsOn
-    .map((depId) => (allFeatures ?? []).find((f) => f.id === depId))
+    .map((depId) => (allFeatures ?? []).find((f) => sameFeatureId(f.id, depId)))
     .filter(Boolean)
-  const successors = (allFeatures ?? []).filter((f) => normalizeDependsOn(f.dependsOn).includes(feature.id))
+  const successors = (allFeatures ?? []).filter((f) =>
+    normalizeDependsOn(f.dependsOn).some((depId) => sameFeatureId(depId, feature.id)),
+  )
+
+  const toggleDependency = (depId) => {
+    const normalizedId = parseFeatureId(depId) ?? depId
+    setDraft((prev) => {
+      const current = normalizeDependsOn(prev.dependsOn)
+      if (current.some((id) => sameFeatureId(id, normalizedId))) {
+        return {
+          ...prev,
+          dependsOn: current.filter((id) => !sameFeatureId(id, normalizedId)),
+        }
+      }
+      if (wouldCreateDependencyCycle(feature.id, normalizedId, allFeatures ?? [])) {
+        setSaveErrors(['This dependency would create a circular reference.'])
+        return prev
+      }
+      return { ...prev, dependsOn: [...current, normalizedId] }
+    })
+    setSaveErrors([])
+  }
+
+  const datesLocked = draft.completed
 
   const handleAddUs = (e) => {
     e.preventDefault()
@@ -265,19 +315,8 @@ const FeatureDetailPanel = forwardRef(function FeatureDetailPanel(
     setCommentText('')
   }
 
-  const toggleDependency = (depId) => {
-    setDraft((prev) => {
-      const current = [...prev.dependsOn]
-      if (current.includes(depId)) {
-        return { ...prev, dependsOn: current.filter((id) => id !== depId) }
-      }
-      if (wouldCreateDependencyCycle(feature.id, [...current, depId], allFeatures ?? [])) {
-        return prev
-      }
-      return { ...prev, dependsOn: [...current, depId] }
-    })
-    setSaveErrors([])
-  }
+  const commentCount = (feature.comments || []).length
+  const usCount = (feature.userStories || []).length
 
   return (
     <>
@@ -308,86 +347,90 @@ const FeatureDetailPanel = forwardRef(function FeatureDetailPanel(
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 space-y-4 overflow-y-auto p-4">
           {needsAlert && (
-            <div className="mb-4 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <div className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" />
               <span>Team no longer assigned to this project. Select a valid team below.</span>
             </div>
           )}
 
           {isBacklogDraft && (
-            <div className="mb-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-              This feature is in the backlog. Assign a team and set dates to show it on the Gantt.
+            <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              Assign a team and dates to show this feature on the Gantt.
             </div>
           )}
 
-          <section className="mb-6">
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Assignment</h3>
-            <label className="mb-1 block text-xs text-gray-500">Team</label>
-            <select
-              value={teamSelectValue}
-              onChange={(e) => {
-                const value = e.target.value
-                setDraft((prev) => ({
-                  ...prev,
-                  teamId: value === BACKLOG_VALUE ? null : value,
-                }))
-                setSaveErrors([])
-              }}
-              className={`w-full rounded-lg border px-3 py-1.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 ${
-                needsAlert ? 'border-amber-400 bg-amber-50' : 'border-gray-300'
-              }`}
-            >
-              <option value={BACKLOG_VALUE}>Unassigned (backlog)</option>
-              {teamOptions.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-          </section>
+          <section className="space-y-3 rounded-lg border border-gray-100 bg-gray-50/50 p-3">
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">Team</label>
+              <select
+                value={teamSelectValue}
+                onChange={(e) => {
+                  const value = e.target.value
+                  setDraft((prev) => ({
+                    ...prev,
+                    teamId: value === BACKLOG_VALUE ? null : value,
+                  }))
+                  setSaveErrors([])
+                }}
+                className={`w-full rounded-lg border bg-white px-3 py-1.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 ${
+                  needsAlert ? 'border-amber-400 bg-amber-50' : 'border-gray-300'
+                }`}
+              >
+                <option value={BACKLOG_VALUE}>Unassigned (backlog)</option>
+                {teamOptions.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
 
-          <section className="mb-6">
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Dates</h3>
-            <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-xs text-gray-500">Start</label>
                 <input
                   type="date"
                   value={draft.startDate}
+                  disabled={datesLocked}
                   onChange={(e) => {
                     setDraft((prev) => ({ ...prev, startDate: e.target.value }))
                     setSaveErrors([])
                   }}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                 />
-                {draft.startDate && (
-                  <p className="mt-0.5 text-[11px] text-gray-400">{formatDay(draft.startDate)}</p>
-                )}
               </div>
               <div>
                 <label className="mb-1 block text-xs text-gray-500">Target</label>
                 <input
                   type="date"
                   value={draft.targetDate}
+                  disabled={datesLocked}
                   onChange={(e) => {
                     setDraft((prev) => ({ ...prev, targetDate: e.target.value }))
                     setSaveErrors([])
                   }}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                 />
-                {draft.targetDate && (
-                  <p className="mt-0.5 text-[11px] text-gray-400">{formatDay(draft.targetDate)}</p>
-                )}
               </div>
             </div>
 
-            {draftMissingDates && (
-              <p className="mt-2 text-xs text-amber-600">
-                Dates required when a team is assigned — set them before saving.
+            {(draft.startDate || draft.targetDate) && (
+              <p className="text-[11px] text-gray-400">
+                {draft.startDate ? formatDay(draft.startDate) : '—'}
+                {' → '}
+                {draft.targetDate ? formatDay(draft.targetDate) : '—'}
               </p>
             )}
 
-            <label className="mt-4 flex items-center gap-2 text-sm text-gray-700">
+            {draftMissingDates && (
+              <p className="text-xs text-amber-600">Dates required when a team is assigned.</p>
+            )}
+
+            {datesLocked && (
+              <p className="text-xs text-gray-500">Dates are locked while the feature is marked as delivered.</p>
+            )}
+
+            <label className="flex items-center gap-2 text-sm text-gray-700">
               <input
                 type="checkbox"
                 checked={draft.completed}
@@ -402,27 +445,22 @@ const FeatureDetailPanel = forwardRef(function FeatureDetailPanel(
             </label>
           </section>
 
-          <section className="mb-6">
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Notes</h3>
+          <section>
+            <label className="mb-1 block text-xs font-medium text-gray-500">Notes</label>
             <textarea
               value={draft.notes}
               onChange={(e) => {
                 setDraft((prev) => ({ ...prev, notes: e.target.value.slice(0, 500) }))
                 setSaveErrors([])
               }}
-              rows={3}
-              placeholder="Quick annotation (like an Excel cell note)"
+              rows={2}
+              placeholder="Quick annotation"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
             />
-            <p className="mt-1 text-right text-[10px] text-gray-400">{draft.notes.length}/500</p>
+            <p className="mt-0.5 text-right text-[10px] text-gray-400">{draft.notes.length}/500</p>
           </section>
 
-          <section className="mb-6">
-            <h3 className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              <Link2 size={12} />
-              Dependencies
-            </h3>
-
+          <CollapsibleSection title="Dependencies" icon={Link2} defaultOpen>
             {depConflicts.length > 0 && (
               <div className="mb-3 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
                 <AlertTriangle size={14} className="mt-0.5 shrink-0" />
@@ -468,15 +506,62 @@ const FeatureDetailPanel = forwardRef(function FeatureDetailPanel(
             >
               <option value="">Add dependency…</option>
               {depPickerFeatures
-                .filter((f) => !draft.dependsOn.includes(f.id))
+                .filter((f) => !draft.dependsOn.some((depId) => sameFeatureId(depId, f.id)))
                 .map((f) => (
                   <option key={f.id} value={f.id}>{f.name} ({f.id})</option>
                 ))}
             </select>
-          </section>
+          </CollapsibleSection>
 
-          <section className="mb-6">
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Comments</h3>
+          <CollapsibleSection title="User Stories" count={`${feature.storyPoints} SP`} defaultOpen={usCount > 0}>
+            <ul className="mb-3 space-y-2">
+              {(feature.userStories || []).map((us) => (
+                <li
+                  key={us.id}
+                  className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm"
+                >
+                  <span className="min-w-0 truncate text-gray-800">{us.title}</span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="text-xs font-medium text-gray-500">{us.storyPoints} SP</span>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveUserStory(feature.id, us.id)}
+                      className="text-gray-400 hover:text-red-500"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </li>
+              ))}
+              {usCount === 0 && <p className="text-xs text-gray-400">No user stories</p>}
+            </ul>
+
+            <form onSubmit={handleAddUs} className="flex gap-2">
+              <input
+                type="text"
+                value={usTitle}
+                onChange={(e) => setUsTitle(e.target.value)}
+                placeholder="Story title"
+                className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              />
+              <input
+                type="number"
+                min="0"
+                value={usPoints}
+                onChange={(e) => setUsPoints(e.target.value)}
+                placeholder="SP"
+                className="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              />
+              <button
+                type="submit"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                <Plus size={14} />
+              </button>
+            </form>
+          </CollapsibleSection>
+
+          <CollapsibleSection title="Comments" count={commentCount} defaultOpen={false}>
             <ul className="mb-3 space-y-2">
               {(feature.comments || []).map((c) => (
                 <li key={c.id} className="rounded-lg border border-gray-100 px-3 py-2 text-xs">
@@ -535,9 +620,7 @@ const FeatureDetailPanel = forwardRef(function FeatureDetailPanel(
                   )}
                 </li>
               ))}
-              {(feature.comments || []).length === 0 && (
-                <p className="text-xs text-gray-400">No comments yet</p>
-              )}
+              {commentCount === 0 && <p className="text-xs text-gray-400">No comments yet</p>}
             </ul>
             <form onSubmit={handleAddComment} className="flex gap-2">
               <input
@@ -549,77 +632,14 @@ const FeatureDetailPanel = forwardRef(function FeatureDetailPanel(
               />
               <button
                 type="submit"
-                className="shrink-0 rounded-lg border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 hover:bg-gray-50"
               >
                 <Plus size={14} />
               </button>
             </form>
-          </section>
+          </CollapsibleSection>
 
-          <section className="mb-6">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                User Stories ({feature.storyPoints} SP)
-              </h3>
-            </div>
-
-            <ul className="mb-3 space-y-2">
-              {(feature.userStories || []).map((us) => (
-                <li
-                  key={us.id}
-                  className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm"
-                >
-                  <span className="min-w-0 truncate text-gray-800">{us.title}</span>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span className="text-xs font-medium text-gray-500">{us.storyPoints} SP</span>
-                    <button
-                      type="button"
-                      onClick={() => onRemoveUserStory(feature.id, us.id)}
-                      className="text-gray-400 hover:text-red-500"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </li>
-              ))}
-              {(feature.userStories || []).length === 0 && (
-                <p className="text-xs text-gray-400">No user stories</p>
-              )}
-            </ul>
-
-            <form onSubmit={handleAddUs} className="space-y-2">
-              <input
-                type="text"
-                value={usTitle}
-                onChange={(e) => setUsTitle(e.target.value)}
-                placeholder="User story title"
-                className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-              />
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  value={usPoints}
-                  onChange={(e) => setUsPoints(e.target.value)}
-                  placeholder="SP"
-                  className="w-20 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                />
-                <button
-                  type="submit"
-                  className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  <Plus size={14} />
-                  Add US
-                </button>
-              </div>
-            </form>
-          </section>
-
-          <section>
-            <h3 className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              <Clock size={12} />
-              History
-            </h3>
+          <CollapsibleSection title="History" icon={Clock} count={history.length} defaultOpen={false}>
             <ul className="space-y-2">
               {history.map((event) => (
                 <li key={event.id} className="rounded-lg border border-gray-100 px-3 py-2 text-xs">
@@ -631,11 +651,9 @@ const FeatureDetailPanel = forwardRef(function FeatureDetailPanel(
                   </div>
                 </li>
               ))}
-              {history.length === 0 && (
-                <p className="text-xs text-gray-400">No events recorded</p>
-              )}
+              {history.length === 0 && <p className="text-xs text-gray-400">No events recorded</p>}
             </ul>
-          </section>
+          </CollapsibleSection>
         </div>
 
         <div className="space-y-3 border-t border-gray-200 p-4">

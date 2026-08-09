@@ -1,18 +1,31 @@
 import {
   BarChart3,
+  CalendarRange,
   ChevronLeft,
   ChevronRight,
   FolderOpen,
+  Home,
   Package,
   Users,
 } from 'lucide-react'
 import { APP_NAME, APP_TAGLINE } from '../brand'
+import BrandWordmark from './BrandWordmark'
 
-const NAV_ITEMS = [
-  { id: 'timeline', icon: BarChart3, label: 'Timeline' },
-  { id: 'projects', icon: FolderOpen, label: 'Projects' },
-  { id: 'teams', icon: Users, label: 'Teams' },
-  { id: 'products', icon: Package, label: 'Products' },
+const NAV_GROUPS = [
+  {
+    items: [{ id: 'home', icon: Home, label: 'Home' }],
+  },
+  {
+    items: [{ id: 'timeline', icon: BarChart3, label: 'Timeline' }],
+  },
+  {
+    items: [
+      { id: 'projects', icon: FolderOpen, label: 'Projects' },
+      { id: 'iterations', icon: CalendarRange, label: 'Iterations' },
+      { id: 'teams', icon: Users, label: 'Teams' },
+      { id: 'products', icon: Package, label: 'Products' },
+    ],
+  },
 ]
 
 export default function Sidebar({
@@ -48,7 +61,9 @@ export default function Sidebar({
           </span>
         ) : (
           <div className="min-w-0 px-2">
-            <p className="truncate text-sm font-semibold">{APP_NAME}</p>
+            <p className="truncate">
+              <BrandWordmark compact className="text-sm" />
+            </p>
             <p className="truncate text-[10px] text-gray-500">{APP_TAGLINE}</p>
           </div>
         )}
@@ -63,21 +78,31 @@ export default function Sidebar({
       </div>
 
       <nav className="border-b border-white/10 p-2">
-        {NAV_ITEMS.map(({ id, icon: Icon, label }) => (
-          <button
-            key={id}
-            type="button"
-            title={label}
-            onClick={() => onNavigate(id)}
-            className={`mb-0.5 flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm transition-colors ${
-              currentPage === id
-                ? 'bg-violet-600 text-white'
-                : 'text-gray-400 hover:bg-white/10 hover:text-white'
-            }`}
-          >
-            <Icon size={18} strokeWidth={1.75} className="shrink-0" />
-            {!collapsed && <span>{label}</span>}
-          </button>
+        {NAV_GROUPS.map((group, groupIndex) => (
+          <div key={groupIndex}>
+            {groupIndex > 0 && (
+              <div
+                className={`my-1.5 ${collapsed ? 'mx-1 border-t border-white/10' : 'mx-2 border-t border-white/10'}`}
+                aria-hidden="true"
+              />
+            )}
+            {group.items.map(({ id, icon: Icon, label }) => (
+              <button
+                key={id}
+                type="button"
+                title={label}
+                onClick={() => onNavigate(id)}
+                className={`mb-0.5 flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm transition-colors ${
+                  currentPage === id
+                    ? 'bg-violet-600 text-white'
+                    : 'text-gray-400 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                <Icon size={18} strokeWidth={1.75} className="shrink-0" />
+                {!collapsed && <span>{label}</span>}
+              </button>
+            ))}
+          </div>
         ))}
       </nav>
 
@@ -132,7 +157,7 @@ export default function Sidebar({
         {!collapsed ? (
           <>
             <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-              Actor
+              User
             </label>
             <input
               type="text"
@@ -146,7 +171,7 @@ export default function Sidebar({
         ) : (
           <div
             className="mx-auto h-8 w-8 rounded-full bg-violet-600/30 text-center text-xs leading-8 text-violet-200"
-            title={actor || 'Set actor name'}
+            title={actor || 'Set user name'}
           >
             {(actor || '?')[0]?.toUpperCase()}
           </div>
