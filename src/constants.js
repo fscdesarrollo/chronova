@@ -4,6 +4,8 @@ export const LEFT_COL_MIN_WIDTH = 200
 export const LEFT_COL_MAX_WIDTH = 720
 export const SECTION_ROW_HEIGHT = 36
 export const WEEK_WIDTH = 72
+export const DAY_WIDTH = 28
+export const MONTH_WIDTH = 96
 export const ROW_HEIGHT = 48
 export const BAR_PADDING = 4
 

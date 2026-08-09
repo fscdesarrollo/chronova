@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 
+const BACKLOG_VALUE = '__backlog__'
+
 export default function AddFeatureModal({
   open,
   onClose,
@@ -8,25 +10,43 @@ export default function AddFeatureModal({
   teams,
   products,
   defaultDates,
+  canPlanOnGantt = true,
 }) {
   const [name, setName] = useState('')
-  const [teamId, setTeamId] = useState(teams[0]?.id ?? '')
+  const [teamId, setTeamId] = useState(BACKLOG_VALUE)
   const [productId, setProductId] = useState(products[0]?.id ?? '')
-  const [customId, setCustomId] = useState('')
-  const [startDate, setStartDate] = useState(defaultDates.startDate)
-  const [targetDate, setTargetDate] = useState(defaultDates.targetDate)
+  const [startDate, setStartDate] = useState('')
+  const [targetDate, setTargetDate] = useState('')
   const [error, setError] = useState('')
+
+  const isBacklog = teamId === BACKLOG_VALUE
 
   useEffect(() => {
     if (!open) return
     setName('')
-    setCustomId('')
-    setTeamId(teams[0]?.id ?? '')
+    const defaultTeam = canPlanOnGantt && teams[0]?.id ? teams[0].id : BACKLOG_VALUE
+    setTeamId(defaultTeam)
     setProductId(products[0]?.id ?? '')
-    setStartDate(defaultDates.startDate)
-    setTargetDate(defaultDates.targetDate)
+    if (defaultTeam === BACKLOG_VALUE) {
+      setStartDate('')
+      setTargetDate('')
+    } else {
+      setStartDate(defaultDates.startDate)
+      setTargetDate(defaultDates.targetDate)
+    }
     setError('')
-  }, [open, teams, products, defaultDates.startDate, defaultDates.targetDate])
+  }, [open, products, teams, canPlanOnGantt, defaultDates.startDate, defaultDates.targetDate])
+
+  const handleTeamChange = (value) => {
+    setTeamId(value)
+    if (value === BACKLOG_VALUE) {
+      setStartDate('')
+      setTargetDate('')
+    } else {
+      setStartDate(defaultDates.startDate)
+      setTargetDate(defaultDates.targetDate)
+    }
+  }
 
   if (!open) return null
 
@@ -36,26 +56,31 @@ export default function AddFeatureModal({
       setError('Name is required.')
       return
     }
-    if (!teamId) {
-      setError('Please select a team.')
-      return
-    }
     if (!productId) {
       setError('Please select a product.')
       return
     }
-    if (targetDate < startDate) {
+
+    if (!isBacklog) {
+      if (!startDate || !targetDate) {
+        setError('Start and target dates are required for planned features.')
+        return
+      }
+      if (targetDate < startDate) {
+        setError('Target date must be on or after the start date.')
+        return
+      }
+    } else if (startDate && targetDate && targetDate < startDate) {
       setError('Target date must be on or after the start date.')
       return
     }
 
     onSave({
       name: name.trim(),
-      teamId,
+      teamId: isBacklog ? null : teamId,
       productId,
-      id: customId.trim() || undefined,
-      startDate,
-      targetDate,
+      startDate: startDate || null,
+      targetDate: targetDate || null,
     })
     onClose()
   }
@@ -93,12 +118,13 @@ export default function AddFeatureModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Team *</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Team</label>
               <select
                 value={teamId}
-                onChange={(e) => setTeamId(e.target.value)}
+                onChange={(e) => handleTeamChange(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
               >
+                <option value={BACKLOG_VALUE}>Unassigned (backlog)</option>
                 {teams.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
@@ -118,20 +144,11 @@ export default function AddFeatureModal({
             </div>
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">ID (optional)</label>
-            <input
-              type="text"
-              value={customId}
-              onChange={(e) => setCustomId(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-              placeholder="Auto-generated (e.g. F-1042)"
-            />
-          </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Start date *</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Start date{isBacklog ? '' : ' *'}
+              </label>
               <input
                 type="date"
                 value={startDate}
@@ -140,7 +157,9 @@ export default function AddFeatureModal({
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Target date *</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Target date{isBacklog ? '' : ' *'}
+              </label>
               <input
                 type="date"
                 value={targetDate}
@@ -149,6 +168,19 @@ export default function AddFeatureModal({
               />
             </div>
           </div>
+
+          {!canPlanOnGantt && (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Assign a calendar, product, and team to this project to place features on the Gantt.
+              You can still add backlog items here.
+            </p>
+          )}
+
+          {isBacklog && (
+            <p className="text-xs text-gray-500">
+              Backlog features appear in the feature panel only until a team is assigned.
+            </p>
+          )}
 
           <div className="flex justify-end gap-3 pt-2">
             <button

@@ -37,6 +37,8 @@ export default function ProjectsPage({
   projects,
   teams,
   projectTeams,
+  iterationPlans = [],
+  projectIterationPlans = [],
   features,
   projectId,
   onSelectProject,
@@ -44,12 +46,15 @@ export default function ProjectsPage({
   onRename,
   onDelete,
   onSetProjectTeams,
+  onSetProjectIterationPlan,
 }) {
   const [newName, setNewName] = useState('')
   const [newTeamIds, setNewTeamIds] = useState([])
+  const [newPlanId, setNewPlanId] = useState(iterationPlans[0]?.id ?? '')
   const [editingId, setEditingId] = useState(null)
   const [editName, setEditName] = useState('')
   const [editTeamIds, setEditTeamIds] = useState([])
+  const [editPlanId, setEditPlanId] = useState('')
   const [error, setError] = useState('')
 
   const featureCount = (id) => features.filter((f) => f.projectId === id).length
@@ -62,12 +67,21 @@ export default function ProjectsPage({
     return teams.filter((t) => ids.includes(t.id)).map((t) => t.name)
   }
 
+  const planIdFor = (id) =>
+    projectIterationPlans.find((pip) => pip.projectId === id)?.planId ?? ''
+
+  const planNameFor = (id) => {
+    const planId = planIdFor(id)
+    return iterationPlans.find((p) => p.id === planId)?.name ?? 'No plan'
+  }
+
   const handleCreate = (e) => {
     e.preventDefault()
     if (!newName.trim()) return
-    onCreate(newName.trim(), newTeamIds)
+    onCreate(newName.trim(), newTeamIds, newPlanId || null)
     setNewName('')
     setNewTeamIds([])
+    setNewPlanId(iterationPlans[0]?.id ?? '')
     setError('')
   }
 
@@ -75,6 +89,7 @@ export default function ProjectsPage({
     if (!editName.trim()) return
     onRename(id, editName.trim())
     onSetProjectTeams(id, editTeamIds)
+    onSetProjectIterationPlan?.(id, editPlanId || null)
     setEditingId(null)
   }
 
@@ -91,13 +106,13 @@ export default function ProjectsPage({
     setEditingId(project.id)
     setEditName(project.name)
     setEditTeamIds(teamIdsForProject(project.id))
+    setEditPlanId(planIdFor(project.id))
   }
 
   return (
     <div className="flex-1 overflow-y-auto bg-white p-6">
-      <h1 className="mb-1 text-xl font-semibold text-gray-900">Projects</h1>
       <p className="mb-6 text-sm text-gray-500">
-        Create projects and assign teams. Teams can belong to multiple projects.
+        Create projects and assign teams and an iteration plan.
       </p>
 
       {error && (
@@ -115,6 +130,19 @@ export default function ProjectsPage({
         <div>
           <p className="mb-1 text-xs font-medium text-gray-600">Assign teams (optional)</p>
           <TeamCheckboxList teams={teams} selectedIds={newTeamIds} onChange={setNewTeamIds} />
+        </div>
+        <div>
+          <p className="mb-1 text-xs font-medium text-gray-600">Iteration plan</p>
+          <select
+            value={newPlanId}
+            onChange={(e) => setNewPlanId(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+          >
+            <option value="">No plan</option>
+            {iterationPlans.map((plan) => (
+              <option key={plan.id} value={plan.id}>{plan.name}</option>
+            ))}
+          </select>
         </div>
         <button
           type="submit"
@@ -149,6 +177,8 @@ export default function ProjectsPage({
                   <div className="font-medium text-gray-900">{project.name}</div>
                   <div className="text-xs text-gray-400">
                     {featureCount(project.id)} feature{featureCount(project.id) !== 1 ? 's' : ''}
+                    {' · '}
+                    {planNameFor(project.id)}
                     {project.id === projectId && ' · Active'}
                   </div>
                   {teamNamesForProject(project.id).length > 0 && (
@@ -202,9 +232,24 @@ export default function ProjectsPage({
               </div>
             </div>
             {editingId === project.id && (
-              <div className="mt-3 border-t border-gray-200 pt-3">
-                <p className="mb-1 text-xs font-medium text-gray-600">Teams in this project</p>
-                <TeamCheckboxList teams={teams} selectedIds={editTeamIds} onChange={setEditTeamIds} />
+              <div className="mt-3 space-y-3 border-t border-gray-200 pt-3">
+                <div>
+                  <p className="mb-1 text-xs font-medium text-gray-600">Teams in this project</p>
+                  <TeamCheckboxList teams={teams} selectedIds={editTeamIds} onChange={setEditTeamIds} />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-gray-600">Iteration plan</p>
+                  <select
+                    value={editPlanId}
+                    onChange={(e) => setEditPlanId(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  >
+                    <option value="">No plan</option>
+                    {iterationPlans.map((plan) => (
+                      <option key={plan.id} value={plan.id}>{plan.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
           </li>

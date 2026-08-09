@@ -33,10 +33,10 @@ export function findSectionForVisualIndex(timelineRows, visualRowIndex) {
  * Resolve team target when dropping at a visual row.
  * Single-team view: only allows move to Needs reassignment.
  */
-export function resolveDropTeamTarget(section, { teamViewMode, filterTeamId }) {
+export function resolveDropTeamTarget(section, { viewMode, filterTeamId }) {
   if (!section) return { teamId: undefined, unassign: false }
 
-  if (teamViewMode === 'single' && filterTeamId) {
+  if (viewMode === 'team' && filterTeamId) {
     if (section.id === 'needs-reassignment') {
       return { teamId: null, unassign: true }
     }
@@ -45,6 +45,10 @@ export function resolveDropTeamTarget(section, { teamViewMode, filterTeamId }) {
 
   if (section.id === 'needs-reassignment') {
     return { teamId: null, unassign: true }
+  }
+
+  if (section.id === 'backlog') {
+    return { teamId: null, unassign: false, toBacklog: true }
   }
 
   if (section.id?.startsWith('team-')) {

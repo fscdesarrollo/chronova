@@ -12,7 +12,7 @@ This document is the single source of truth for product behavior and technical c
 
 **Status:** in refinement — all current MVPs are frontend-only (no backend). Do not implement backend/API/DB until MVP 3 is explicitly scoped.
 
-**Current focus:** MVP 1.5 — project hierarchy, navigation, and UX (`localStorage` persistence).
+**Current focus:** MVP 2 — baseline, ghost bars, and functional history (blocked until refinement session). Persistence: `localStorage`.
 
 ---
 
@@ -56,8 +56,8 @@ A functional prototype already exists in this repository (React + Vite + Tailwin
 
 - **Audience:** executives, Product Owners, RTEs, and technical leads within the company.
 - **Authentication:** none in v1.
-- **Actor identification:** a simple display name stored in `localStorage` — no user accounts, no roles.
-- **Permissions:** everyone can view and edit. All changes are recorded with actor + timestamp in the audit log.
+- **User display name:** a simple name stored in `localStorage` (sidebar label **User**) — no user accounts, no roles. Audit events still use an `actor` field internally.
+- **Permissions:** everyone can view and edit. All changes are recorded with user name + timestamp in the audit log.
 - **User management:** explicitly out of scope for v1.
 
 ---
@@ -119,40 +119,96 @@ Sprint 1 ── Sprint 2 ── Sprint 3 ── IP (3 wks innovation) ── Pla
 | **Project** | Primary unit — all work belongs to a project first | Matches how initiatives are organized for executives and RTEs |
 | **Team** | Global registry; 1..N teams assigned per project | Multiple teams can work simultaneously within the same project |
 | **Product** | Global registry; assigned to 1..N projects via `project_products` | Identification label (name + color) — **not** a full epic/backlog hierarchy |
-| **Feature** | Smallest planned unit on the Gantt | Always linked to project + team + product |
+| **Feature** | Smallest plannable unit | Always linked to project + product; team and dates optional until planned |
+| **Backlog** | Unplanned features (no team) | Listed in the feature panel only — no Gantt bar |
 
 ```
 Project: CARB Platform
 ├── Product A (#3B82F6)   → identification label, shared across teams
 ├── Product B (#10B981)
+├── Backlog (no team)
+│   └── 9, 10...   → no Gantt bar
 ├── Team: CARB Data Platform
-│   └── F-1042, F-1087...
+│   └── 1, 2...
 └── Team: API Integration
-    └── F-1201, F-1205...
+    └── 16, 17...
 ```
 
 **Product semantics:** a Product is a lightweight global identification label (name + color) for visual grouping on the Gantt. Products are assigned to projects via `project_products` — the same product may appear in multiple projects. It is **not** an epic or parent work item in a backlog tree.
 
-**Hierarchy:** Project → Team → Feature, with Product as a cross-cutting visual identifier assigned to projects.
+**Hierarchy:** Project → (Backlog | Team) → Feature, with Product as a cross-cutting visual identifier assigned to projects.
 
 Rejected alternatives: timeline per product (fragments the view), timeline per full ART (too noisy for executives), team as the top-level unit (does not reflect multi-team projects).
 
-#### Assignment status
+#### Iterations (calendar plans) — Phase A
 
-Entities can enter an invalid or pending state when relationships are broken. The UI shows a warning icon and tooltip; planning dates are **never** auto-moved.
+Reusable **iteration plans** define the timeline calendar. Methodology-neutral naming in the UI (**Iterations**); SAFe vocabulary appears inside a plan when `methodology = safe`.
 
-| Entity | Status | When | UI |
-|--------|--------|------|-----|
-| Feature | `team_unassigned` | Team was unassigned from the project | Alert icon on row; tooltip: *"Team no longer assigned to this project"* |
-| Feature | `ok` | Team is in `project_teams` for the feature's project | No alert icon |
-| Product | `project_unassigned` | Product has no entries in `project_products` | Alert icon; tooltip: *"No project assigned"* |
-| Product | `ok` | Product is assigned to at least one project | No alert icon |
+| Entity | Role |
+|--------|------|
+| **Iteration plan** | Named calendar configuration (`methodology: safe` for now); shared across projects |
+| **Timebox / iteration** | Program Increment within a plan (name + date range); created via **Create iteration** |
+| **Sprint** | Child of a timebox (editable name, free-text type, dates, week count, **timeline scale**) |
+| **project_iteration_plans** | Each project has **exactly one** plan; assignment is configured only on the **Projects** page |
+
+**SAFe template (v1):** creating an iteration from a start date generates 4 sprints (3+3+3+4 weeks). Sprint fields are editable afterward; timebox start/end are derived from its sprints.
+
+**Sprint timeline scale:** each sprint chooses the Gantt leaf unit — `day`, `week` (default), or `month`. Example: Sprint `26.2.1` with scale `week` shows `Week 1…` columns; with scale `day` shows one column per day. Mixed scales across sprints in the same plan are supported.
+
+**Current timebox:** automatic — the timebox that contains **today**; if none, the first future timebox. Used for Add Feature default dates.
+
+**Pages:** sidebar **Iterations** (CRUD plans / iterations / sprints; read-only list of projects using the plan). **Projects** assigns the plan. Timeline top bar shows `Plan: {name}` only on the Timeline page.
+
+**UI chrome:** management pages use a single title in the top bar (no duplicate in-page H1). Current/Baseline toggle is removed; the app always shows the current plan view.
+
+#### Planning status and assignment status
+
+Features have two independent status dimensions:
+
+| Dimension | Values | Meaning |
+|-----------|--------|---------|
+| **Planning status** | `backlog` \| `planned` | Whether the feature is on the execution timeline |
+| **Assignment status** | `ok` \| `team_unassigned` | Whether the feature's team is still valid for the project |
+
+**Planning status:**
+
+| Status | When | Gantt bar | Feature panel |
+|--------|------|-----------|---------------|
+| `backlog` | Created without a team (intentional) | **No bar** — not on the timeline grid | **Backlog** section |
+| `planned` | Team assigned; feature is being tracked on the timeline | Bar rendered (requires valid dates) | Under assigned team section |
+
+**Assignment status** (planned features only):
+
+| Status | When | UI |
+|--------|------|-----|
+| `team_unassigned` | Team was unassigned from the project | Alert icon on row; tooltip: *"Team no longer assigned to this project"*; bar positions preserved |
+| `ok` | Team is in `project_teams` for the feature's project | No alert icon |
+
+**Backlog vs Needs reassignment:**
+
+| Concept | Cause | Has Gantt bar? | Section |
+|---------|-------|----------------|---------|
+| **Backlog** | Feature created without a team | No | **Backlog** |
+| **Needs reassignment** | Team removed from project after planning | Yes (dates preserved) | **Needs reassignment** |
 
 **Reassignment rules:**
 
-- Unassigning a team from a project is **always allowed**, even when features reference that team. Affected features become `team_unassigned`; start/target dates and bar positions are unchanged.
+- Unassigning a team from a project is **always allowed**, even when planned features reference that team. Affected features become `team_unassigned`; start/target dates and bar positions are unchanged.
 - In **Single team** view, `team_unassigned` features appear in a **"Needs reassignment"** section at the bottom of the feature list. Bar positions on the timeline grid are preserved.
 - Reassign team via the feature detail panel (dropdown limited to teams assigned to the project).
+- Assigning a team to a backlog feature transitions it to `planned`. If dates are missing, prompt for start and target dates before showing the Gantt bar.
+
+**Missing dates indicator:**
+
+- Features without `start_date` and/or `target_date` (backlog or planned) show a **calendar attention icon** on the feature row (e.g. `CalendarOff`) with tooltip: *"Dates not set"*.
+- Planning dates are **never** auto-moved when relationships change.
+
+Entities other than features can also enter an invalid state:
+
+| Entity | Status | When | UI |
+|--------|--------|------|-----|
+| Product | `project_unassigned` | Product has no entries in `project_products` | Alert icon; tooltip: *"No project assigned"* |
+| Product | `ok` | Product is assigned to at least one project | No alert icon |
 
 #### Delete rules
 
@@ -181,20 +237,24 @@ All CRUD is performed in the app. No backend.
 
 #### Features
 
-A **feature** is the smallest unit planned and displayed on the Gantt.
+A **feature** is the smallest plannable unit. Planned features appear on the Gantt; backlog features appear in the feature panel only.
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| ID | Yes | Unique identifier (e.g. `F-1042`) |
+| ID | Yes | Auto-generated integer identity (1, 2, 3…); assigned on save. Frontend generates locally until backend returns DB identity. |
 | Name | Yes | Descriptive title; editable after creation |
 | Project | Yes | Parent project |
-| Team | Yes | Team working on the feature; editable after creation |
 | Product | Yes | Product from project catalog (`project_products`); determines bar color |
-| Assignment status | Yes | `ok` or `team_unassigned` (derived from team ↔ project relationship) |
-| Start date | Yes | When work begins; maps to the corresponding week on the Gantt |
-| Target date | Yes | Expected delivery date; defines where the bar ends on the Gantt |
+| Planning status | Yes | `backlog` or `planned` (derived from team assignment) |
+| Team | No (backlog) / Yes (planned) | Team working on the feature; editable after creation |
+| Assignment status | Yes | `ok` or `team_unassigned` (derived from team ↔ project relationship; planned features only) |
+| Start date | No | When work begins; required when assigning a team; may be cleared on edit |
+| Target date | No | Expected delivery date; required when assigning a team; may be cleared on edit |
 | User Stories | No | Manually entered in v1; each US has title + story points |
 | Story points | No | Sum of US points; auto-calculated; informational |
+| Notes | No | Free-text field (~500 chars); separate from comments |
+| Comments | No | Flat thread of discussion entries (see [Comments](#comments)) |
+| Depends on | No | Array of feature IDs this feature depends on (same project) |
 | Completed | Yes | Whether the feature has been delivered |
 | Cross-PI | No | Visual indicator when the feature spans multiple PIs |
 | Baseline | No | Frozen dates after refinements (see Baseline model) |
@@ -221,7 +281,9 @@ Day (08, 20)            →  display only, not a separate editable field
 **Story points:**
 
 - User Stories are entered manually in v1.
-- Story points are **informational** (footer totals, feature detail). They do **not** drive bar length — the bar span comes from start date → target date.
+- Story points are **informational**. They do **not** drive bar length — the bar span comes from start date → target date.
+- When `storyPoints > 0`, display on the feature row (secondary line badge, e.g. `13 SP`) and on the Gantt bar when width allows (discrete suffix, e.g. `· 13 SP`). Do not show `0 SP`.
+- Footer totals include features with a **valid Gantt bar** only (team + start + target dates).
 
 **Cross-PI features:**
 
@@ -236,23 +298,149 @@ Features are created via a **simple modal** opened from the **"Add Feature"** bu
 | Field | Required | Default | Notes |
 |-------|----------|---------|-------|
 | Name | Yes | — | Descriptive title |
-| Team | Yes | — | Dropdown from teams assigned to the active project |
+| Team | No | — | Dropdown from teams assigned to the active project; **"Unassigned (backlog)"** option creates a backlog feature |
 | Product | Yes | — | Dropdown from the active project's products; determines bar color |
-| ID | No | Auto-generated | Format `F-{number}` (e.g. `F-1042`); user can override |
-| Start date | Yes | First day of current PI | Maps to the corresponding week on the Gantt |
-| Target date | Yes | Start date + 1 week | Defines bar end; must be ≥ start date |
+| Start date | No (backlog) / Yes (planned) | Empty (backlog) or first day of current PI (planned) | Optional for backlog; required when saving with a team; may be cleared on edit — feature stays on Gantt without bar |
+| Target date | No (backlog) / Yes (planned) | Empty (backlog) or start + 1 week (planned) | Must be ≥ start date when both are set |
+
+**ID:** not user-editable. Assigned automatically when the feature is saved (`max(existing ids) + 1` in the frontend). When a backend is integrated, the API will return the database identity instead.
+
+**Date rules (MVP 1.7):**
+
+| Scenario | Dates required? | Gantt bar? |
+|----------|-----------------|------------|
+| Create in **Backlog** | No — fields default **empty** | No |
+| Create with **team** | Yes — pre-filled with current PI | Yes (when valid) |
+| Edit — clear dates on planned feature | Allowed | No — missing-dates icon on row |
+| **Assign team** from backlog | Yes — validated on **Save** in detail panel | Yes after dates set |
+| Feature has team but no dates | Allowed | No — missing-dates icon; **not** moved to Backlog |
+
+**Footer counts:** only features with a **valid Gantt bar** (planned + team + start date + target date).
 
 **Flow:**
 
 1. User clicks **"Add Feature"** in the top bar.
 2. Modal opens with the fields above.
-3. User fills name, team, product, start date, and target date (minimum).
-4. On save: feature appears as a new row; bar spans from the week of start date to the week of target date.
-5. The specific day is displayed on the bar/row but is not editable independently.
+3. User fills name and product (minimum). For backlog, team and dates stay empty by default. For planned, team and pre-filled dates are required on save.
+4. On save:
+   - **Backlog** (no team): feature appears in the **Backlog** section; no Gantt bar (dates optional).
+   - **Planned** (team selected): feature appears under the team section; bar spans start → target (dates required).
+5. The specific day is displayed on the bar/row when dates exist but is not editable independently.
 6. Audit event `feature.created` is recorded (actor + timestamp).
-7. User can reposition or resize the bar via drag-and-drop (updates dates to match new weeks).
+7. Planned features with valid dates can be repositioned or resized via drag-and-drop.
 
-**Editing:** clicking an existing feature opens the **detail panel** (history + US + dates + team + name). Start date, target date, team, and name are editable there. A dedicated edit modal is not required.
+**Assigning team from backlog:** team can be selected freely while editing. On **Save**, if a team is assigned, start and target dates are required; validation errors are shown in the panel.
+
+**Detail panel editing:** name, team, dates, delivered flag, notes, and dependencies are edited in a **draft** state. **Start and target dates preview live** on the Gantt bar while editing (before Save). Click **Save changes** to persist. Comments and user stories save immediately. If the user closes the panel, selects another feature, or clicks outside with unsaved changes, a dialog offers **Save**, **Discard**, or **Cancel** (keep editing).
+
+**Editing:** clicking an existing feature opens the **detail panel** (history, notes, comments, US, dependencies, dates, team, name). A dedicated edit modal is not required.
+
+#### Notes
+
+A single free-text **notes** field per feature (~500 characters). Distinct from the comment thread.
+
+| Aspect | Behavior |
+|--------|----------|
+| Purpose | Quick annotation — Excel-style cell note replacement |
+| UI | Editable in detail panel; **note icon** on feature row when non-empty |
+| Storage | `notes` string on feature |
+
+#### Comments
+
+A flat **comment thread** per feature for lightweight discussion. Distinct from notes.
+
+| Aspect | Behavior |
+|--------|----------|
+| Model | `{ id, author, text, createdAt, updatedAt? }` — chronological, no nesting |
+| Max length | 500 characters per comment |
+| Edit/delete | Author may edit or delete their own comments (matched by actor name) |
+| Row indicator | `MessageSquare` icon when ≥1 comment exists — **presence only**, no count badge |
+| UI | Thread + input in detail panel; no inline bubbles on the Gantt canvas |
+
+#### Feature dependencies
+
+Features can declare **depends on** relationships to other features in the same project. This is for traceability, not automatic scheduling.
+
+| Aspect | Behavior |
+|--------|----------|
+| Model | `dependsOn: number[]` — feature IDs this feature depends on (unidirectional) |
+| Scope | Same project; may cross teams |
+| Configuration | Multi-select in detail panel |
+| Validation | No self-reference; no cycles |
+| Backlog targets | Dependency links allowed in the panel; backlog features have no Gantt highlight |
+| Date conflict | Warning icon + tooltip when a predecessor's `target_date` is after the dependent's `start_date` |
+| Selection focus | On feature select: direct predecessors and successors highlighted; other rows/bars at ~25% opacity |
+| Connectors | **Not in MVP 1.6** — no SVG lines between bars (highlight + list only) |
+
+#### Gantt rules
+
+Per-project visual rules configured in **Gantt Settings → Rules** tab. Rules evaluate feature fields and apply visual accents **on top of** the product bar color — they do not replace the product fill.
+
+**Available condition fields:**
+
+| Field | Operators | Example |
+|-------|-----------|---------|
+| `target_date` | `< today`, `> today`, `<`, `>`, `=` | Overdue |
+| `start_date` | `< today`, `>`, `<`, `=` | Not started |
+| `completed` | `is true` / `is false` | In progress |
+| `deviation` (MVP 2) | `> N weeks` | Slipped |
+| `cross_pi` | `is true` | Cross-PI |
+| `story_points` | `>`, `<`, `=` | Large feature |
+| `assignment_status` | `equals` | Needs reassignment |
+| `name` | `contains`, `not contains`, `equals`, `starts with` | Name contains "Terminal" |
+
+**Rule builder:** each rule has editable **conditions** and **actions**. Conditions combine with **AND** (`matchMode: all`) or **OR** (`matchMode: any`). The Gantt Settings modal provides add/edit/remove for rules, condition rows (field + operator + value), and action rows — same delete pattern as markers. Feature-match preview ("Matches N features") is deferred.
+
+**Pre-installed rules (editable, disableable, deletable):**
+
+| Rule | Condition | Purpose |
+|------|-----------|---------|
+| **Overdue** | `target_date < today` AND `completed = false` | Not delivered and past target |
+| **Completed overdue** | `target_date < today` AND `completed = true` | Delivered after the target date |
+
+**Available actions (combinable per rule):**
+
+| Action | Example use |
+|--------|-------------|
+| Left border (3–4px) | Overdue → red |
+| Row icon | `Clock` or `Alert triangle` on the feature row |
+| Bar pattern | Diagonal stripes over product color |
+| Opacity | Reduced opacity for completed |
+
+**Tooltips:** rule-driven row icons and left-border highlights show a tooltip naming the matching rule(s) (e.g. `Rule: Overdue — Clock`).
+
+**Rule evaluation:**
+
+- Rules are **per project**, persisted in `localStorage` (`formattingRules` key — internal name unchanged).
+- **Each rule is independent** — if a rule's conditions match, its actions apply.
+- **All matching rules apply** their actions (multiple rules may match the same feature).
+- Rules apply in **Current and Baseline** views.
+- Overdue uses **day-level** comparison (`target_date < today`).
+- Users can add, edit, enable/disable, and **delete any rule** (including pre-installed defaults). Deleted defaults are not re-seeded on reload.
+
+#### Plan marker grouping
+
+When multiple plan markers share the same date, they are **grouped** in the timeline header:
+
+| State | Behavior |
+|-------|----------|
+| Collapsed (default) | Single pill with generic label (e.g. `3 markers`); single vertical body line in dominant marker color |
+| Expanded (click) | Popover lists all markers (label, date, color) — **read-only**; no duplicate stacked pills in the header |
+| Hover | Tooltip on grouped pill lists all marker labels |
+
+Markers remain visible in Current and Baseline views.
+
+#### Collapsible timeline sections (MVP 1.7)
+
+Team, **Backlog**, and **Needs reassignment** section headers are collapsible. Collapsing a section hides all feature rows in that section in **both** the feature panel and the Gantt body (rows stay vertically aligned).
+
+| Aspect | Behavior |
+|--------|----------|
+| Toggle | Chevron on section header |
+| Scope | All section types (teams, Backlog, Needs reassignment) |
+| Sync | Left panel and Gantt collapse together |
+| Global actions | **Collapse all** / **Expand all** controls on the feature panel |
+| Persistence | Per-project `collapsedSections` in `localStorage` |
 
 #### Baseline and audit trail
 
@@ -278,46 +466,85 @@ The baseline is **per feature**, not a single PI-wide snapshot. The Gantt has me
 | Current | Current bars + ghost baseline behind when deviated |
 | Baseline | Only bars at their frozen original positions |
 
-#### Screens and interactions (MVP 1.5)
+#### Screens and interactions (MVP 1.5 / 1.6 / 1.7)
 
 **Collapsible sidebar navigation**
 
 The left sidebar is the app navigation hub. It can be collapsed (icons only + tooltips) or expanded (icons + labels). Collapsed/expanded state persists in `localStorage`.
 
-| Section | Content |
-|---------|---------|
-| **Timeline** | Main Gantt view (default page) |
-| **Projects** | Project list + CRUD (create, rename, delete) |
+Navigation is grouped visually (separators between groups):
+
+| Group | Pages |
+|-------|-------|
+| **Landing** | **Home** |
+| **Work** | **Timeline** |
+| **Configuration** | Projects, Iterations, Teams, Products |
+
+| Page | Content |
+|------|---------|
+| **Home** | Brand landing: hero, pillars, **Take a tour** (highlighted on first visit), continue to last page, setup wizard |
+| **Timeline** | Main Gantt view |
+| **Projects** | Project list + CRUD; assign iteration plan and teams |
+| **Iterations** | Reusable iteration plans, timeboxes (PIs), sprints |
 | **Teams** | Global team registry + CRUD + assign/unassign to projects |
 | **Products** | Global product catalog + CRUD + color picker + project assignment |
 
-The **active project** selector and **team view** toggle live in the sidebar on the **Timeline** page only.
+The **active project** selector, **View** filter, and **User** name field live in the sidebar (project/view filters on **Timeline** only).
 
-**Team view toggle** (Timeline page):
+#### Onboarding and first-run UX
+
+Chronova is **Gantt-centric**: configuration pages are prerequisites; the goal is a project ready to plan on the Timeline.
+
+| Flow | Behavior |
+|------|----------|
+| **First open** | No `chronova-navigation` → land on **Home** |
+| **Return visit** | `chronova-navigation.lastPage` → restore last page (e.g. Timeline) |
+| **Product tour** (`app-intro`) | Spotlight walkthrough with **real page navigation**; relaunchable from Home (**Take a tour**). Registry: `src/tours/registry.js`; runner: `TourRunner`. Elements use `data-tour` attributes. Final step: offer setup or **Skip setup for now**. |
+| **Tour CTA highlight** | On first Home visit (no navigation history, tour not completed), **Take a tour** shows an animated futuristic highlight (“Start here”). |
+| **Setup wizard** | On demand only (Home, tour end, checklist). Steps: User name → Project + calendar start → Team → First feature. Calls `setupProjectForGantt` (auto-creates plan/timebox/product if needed). Does **not** open automatically on app load. |
+| **Gantt checklist** | On Timeline when project is not Gantt-ready: project → calendar → product → team → first feature on Gantt. Dismissible. |
+| **Gantt-ready** | Computed by `ganttReadiness` (`src/utils/ganttReadiness.js`): plan with timebox, product assigned, team assigned; first bar optional for “complete” checklist. |
+
+Per-page tours (e.g. Timeline-only) are planned via the same tour registry pattern (v2).
+
+**View filter** (Timeline page — replaces "Team view"):
 
 | Mode | Behavior |
 |------|----------|
-| **All teams** | All features for the active project; rows grouped under collapsible team section headers |
-| **Single team** | Features filtered to the selected team; `team_unassigned` features in **"Needs reassignment"** section at the bottom (bar positions unchanged) |
+| **All** | Full timeline: Backlog + team sections + Needs reassignment |
+| **Backlog** | Only the Backlog section; same create/edit behavior as All |
+| **{Team name}** | Features for the selected team; **Needs reassignment** section at the bottom (unchanged) |
+
+Dropdown order: **All → Backlog → teams** (alphabetical or project assignment order).
+
+State model: `viewMode: 'all' | 'backlog' | 'team'` + `filterTeamId` when `viewMode === 'team'`. Replaces `teamViewMode` / `filterTeamId` pair from MVP 1.6.
 
 | Screen / area | Content |
 |---------------|---------|
-| Sidebar | Collapsible navigation + active project selector + team view toggle |
-| Top bar | Project name, PI range label, Current/Baseline toggle, **Gantt settings** icon, **Add Feature** button |
-| Gantt settings | Gear icon in top bar (before Add Feature); modal with Markers tab (extensible for future Gantt config) |
-| Add Feature modal | Name, team, product, ID (optional), start date, target date |
-| Timeline header | PIs → sprints → weeks; **TODAY** pill in shared header row; **plan markers** with label + date visible |
+| Sidebar | Grouped nav: **Home** · Timeline · Projects, Iterations, Teams, Products; **User** name; active project + **View** filter (Timeline only) |
+| Top bar | Page title; on Timeline only: `Plan: {name}`; **Gantt settings** + **Add Feature** (Timeline only). Dark variant on Home. |
+| Home | `TimeHorizon` background, `BrandWordmark`, pillars, CTAs: **Take a tour**, continue to last page, setup wizard, advanced configuration |
+| Onboarding | See [Onboarding and first-run UX](#onboarding-and-first-run-ux) above |
+| Gantt settings | Gear icon in top bar; modal with **Markers** and **Rules** (editable condition/action builder) tabs |
+| Add Feature modal | Backlog or planned; blocked until project has a product; planned path needs team + calendar for Gantt bar |
+| Feature panel | Compact layout: team + dates + Delivered (locks dates when checked), notes, dependencies, user stories; **Comments** and **History** collapsible at bottom |
+| Timeline header | PIs → sprints → weeks; **TODAY** pill; **plan markers** (grouped when same date) |
 | Today marker | Auto-calculated vertical line at current day; **TODAY** label in fixed shared header row; horizontal scroll synced with Gantt body |
-| Plan markers | Per-project vertical markers (label, exact date, color); stacked labels when same day; visible in Current and Baseline views |
-| Feature rows | ID, name (expands as panel widens), product color dot, assignment alert icon, dates, Gantt bar |
+| Plan markers | Per-project vertical markers; grouped pill when same date; expand to list; single body line per date |
+| Feature rows | ID, name, product color dot, SP badge, notes/comments icons, missing-dates icon, assignment alert, dates, Gantt bar (planned only) |
+| Backlog section | Features without team — panel row only, no Gantt bar |
 | Feature name panel | Split-pane left column — shared header row with timeline; bodies scroll in sync below |
-| Footer | Feature count, total SPs, moved count; drag hints |
-| Feature detail (on click) | Editable name and team, dates, history, associated User Stories; closes on click outside |
+| Footer | Feature count with **valid Gantt bar** only, total SPs (same scope), moved count; drag hints |
+| Feature detail (on click) | Name, team, dates (locked when Delivered), notes, dependencies, US; Comments and History at end; **Save changes**; closes on click outside (with unsaved prompt) |
 
 | Interaction | Behavior |
 |-------------|----------|
-| Add Feature | Opens create modal; on save, adds row + bar spanning start date → target date |
-| Edit feature name | Editable in detail panel; immediate update in list and Gantt bar |
+| Add Feature | Opens create modal; backlog (no team) or planned (team + dates) |
+| Assign team to backlog | Select team in detail panel; dates validated on **Save** |
+| Collapse section | Hide section rows in feature panel and Gantt; persisted per project |
+| Collapse all / Expand all | Toggle all section headers at once |
+| Edit feature name | Editable in detail panel; saved with **Save changes** |
+| Detail panel save | Draft edits; **Save changes** button; unsaved dialog on close or switch feature |
 | Change feature team | Editable in detail panel; or drag row/bar into another team section (audit `feature.team_changed`) |
 | Drag to Needs reassignment | Drop on **Needs reassignment** section → `teamId` cleared, `team_unassigned` status |
 | Drag in Single team view | Only move to **Needs reassignment** (cannot assign to other teams from filtered view) |
@@ -325,12 +552,16 @@ The **active project** selector and **team view** toggle live in the sidebar on 
 | Drag bar | Updates start/target dates; vertical drop may change team based on section |
 | Drag row | Reorder within/between team sections; team changes when dropped under a different team header |
 | Timeline scroll memory | Per project; saved when **leaving Timeline page** (not on F5 refresh); restored on return; defaults to centered on Today |
-| Gantt markers | Create/edit/delete via Settings modal; scroll to new marker date after save |
+| Gantt markers | Create/edit/delete via Settings modal; grouped display when same date; scroll to new marker date after save |
+| Rules | Configure in Gantt Settings → Rules; evaluated in the current plan view |
+| Feature dependencies | Configure in detail panel; focus highlight on select |
+| Comments | Add/edit/delete (own) in detail panel; presence icon on row |
+| Notes | Edit in detail panel; note icon on row when non-empty |
 | Horizontal scroll | Navigate across PIs or dynamic weeks |
-| Toggle Current/Baseline | Compare current plan vs original (functional in MVP 2); markers visible in both views |
-| Click feature | Open detail panel |
+| Toggle Current/Baseline | Compare current plan vs original (functional in MVP 2); markers and formatting rules visible in both views |
+| Click feature | Open detail panel; dependency focus mode (highlight chain, dim others) |
 | Click outside feature | Close detail panel |
-| Add US | Manual entry; SPs are informational only (do not resize bar) |
+| Add US | Manual entry; SPs are informational only (do not resize bar); SP badge updates on row/bar |
 
 ### Deliberately out of scope (MVP 1.5 — frontend only)
 
@@ -386,7 +617,7 @@ Displayed when dates differ from baseline and a baseline exists for the feature.
 
 ```json
 {
-  "featureId": "F-1042",
+  "featureId": 1,
   "baseline": {
     "startDate": "2026-05-08",
     "targetDate": "2026-06-20",
@@ -402,9 +633,15 @@ Each relevant change appends an event (never overwrites previous state):
 
 | Event | Trigger | Data captured |
 |-------|---------|---------------|
-| `feature.created` | Feature added to Gantt | dates, product, team, project |
+| `feature.created` | Feature added | dates, product, team, project, planning status |
+| `feature.team_assigned` | Backlog feature assigned to a team | previous status, team |
 | `feature.renamed` | Feature name edited in detail panel | previous name, new name |
 | `feature.team_changed` | Feature team changed in detail panel | previous team, new team |
+| `feature.comment_added` | Comment added to feature | comment id |
+| `feature.comment_edited` | Comment edited | comment id |
+| `feature.comment_deleted` | Comment deleted | comment id |
+| `feature.dependency_added` | Dependency link created | depends-on feature id |
+| `feature.dependency_removed` | Dependency link removed | depends-on feature id |
 | `project.created` / `project.renamed` / `project.deleted` | Project CRUD | project id, name |
 | `team.created` / `team.renamed` / `team.deleted` | Team CRUD | team id, name |
 | `team.assigned` / `team.unassigned` | Team assigned/unassigned from project | project id, team id |
@@ -442,7 +679,7 @@ Every event includes: `timestamp`, `actor` (simple name string), and `reason` (f
 
 ## Technical stack
 
-### MVP 1.5 (current focus) — frontend only
+### MVP 1.5 / 1.6 / 1.7 — frontend only
 
 | Layer | Choice |
 |-------|--------|
@@ -450,29 +687,35 @@ Every event includes: `timestamp`, `actor` (simple name string), and `reason` (f
 | Styling | Tailwind CSS |
 | Icons | Lucide React |
 | State & persistence | React state + `localStorage` (no backend) |
-| Backend | **Not in scope for MVP 1.5** |
-| Database | **Not in scope for MVP 1.5** |
+| Backend | **Not in scope until MVP 3** |
+| Database | **Not in scope until MVP 3** |
 | Hosting | Local dev / static build — deployment deferred |
 
 The app is a static SPA. All CRUD and state management run in the browser. No server, no API calls.
 
-### Client-side persistence (MVP 1.5)
+### Client-side persistence (MVP 1.5 / 1.6 / 1.7)
 
 All data lives in the browser until MVP 3 adds a backend:
 
-| Concern | MVP 1.5 approach |
-|---------|------------------|
+| Concern | Approach |
+|---------|----------|
 | Projects, teams, project_teams, products, project_products | Serialized to `localStorage` |
+| Iteration plans, timeboxes, sprints, project_iteration_plans | Serialized to `localStorage` |
 | Features, US, baselines | Serialized to `localStorage` |
 | Audit events | Appended in `localStorage` (same structure as future DB model) |
-| Actor name | `localStorage` key `chronova-actor` |
-| Layout preferences | Sidebar collapsed state, left column width, feature panel collapsed |
+| User display name | `localStorage` key `chronova-actor` (UI label **User**; audit field `actor`) |
+| Navigation memory | `chronova-navigation`: `{ hasVisited, lastPage }` — new users → Home; returning → last page |
+| Onboarding state | `chronova-onboarding`: `{ wizardCompleted, tourCompleted, checklistDismissed }` |
+| Layout preferences | Sidebar collapsed state, left column width, feature panel collapsed (`chronova-layout`) |
 | Timeline scroll position | Per-project view (`chronova-view`); saved on leaving Timeline page; defaults to Today on first visit |
 | Timeline markers | Per-project markers (`timelineMarkers` in main state) |
-| PI/sprint calendar | Static seed data in code; dynamic weeks when unconfigured |
+| Rules | Per-project rules (`formattingRules` in main state; UI label **Rules**) |
+| View filter | `viewMode` (`all` \| `backlog` \| `team`) + `filterTeamId` when team view |
+| Collapsed sections | Per-project section collapse state (`collapsedSections` in main state) |
+| PI/sprint calendar | Derived from the project's assigned iteration plan |
 | Multi-user sharing | Not supported — each browser has its own copy |
 
-**Migration:** `loadState()` migrates legacy data (team-only model) by creating a default project and assigning `projectId` to existing features and products.
+**Migration:** `loadState()` migrates legacy data (team-only model) by creating a default project and assigning `projectId` to existing features and products. MVP 1.7 adds migration from `teamViewMode` → `viewMode` and initializes `collapsedSections` per project when absent. Feature ids migrate from legacy `F-{n}` strings to integer identity values; `dependsOn` and audit `featureId` references are remapped. Missing iteration plans are seeded from the default SAFe calendar and assigned to all projects.
 
 This keeps data shapes aligned with the [future data model](#data-model-future-mvp) so migration to a backend later is straightforward.
 
@@ -480,32 +723,52 @@ This keeps data shapes aligned with the [future data model](#data-model-future-m
 
 ```
 src/
-  components/     React UI (Sidebar, TopNav, TimelineGrid, GanttSettingsModal, management pages, etc.)
+  components/     React UI (Sidebar, TopNav, TimelineGrid, GanttSettingsModal, pages, BrandWordmark, …)
+  components/onboarding/  SetupWizard, TourRunner, GanttSetupChecklist, TourCtaHighlight
+  components/pages/       Home, Projects, Iterations, Teams, Products
+  tours/          Tour registry (`app-intro`; extensible per page)
   hooks/          useTimelineState, useFeatureDrag, useLeftColResize
-  utils/          dates, storage, weekCalendar, timelineLayout, featureGroups, migration
-  data.js         Static PI/sprint seed data
+  utils/          dates, storage, navigation, onboarding, ganttReadiness, weekCalendar, migration, …
+  data.js         Static seed data
   constants.js    Layout dimensions and drag helpers
-docs/             Project documentation
+docs/             Project documentation (project.md, brand.md)
 ```
 
-### Client-side data shape (MVP 1.5)
+### Client-side data shape (MVP 1.5 / 1.6 / 1.7)
 
 ```json
 {
+  "viewMode": "all",
+  "filterTeamId": null,
+  "collapsedSections": { "proj-carb": ["backlog"] },
   "projects": [{ "id": "proj-carb", "name": "CARB Platform", "createdAt": "..." }],
   "teams": [{ "id": "carb-dp", "name": "CARB Data Platform", "createdAt": "..." }],
   "projectTeams": [{ "projectId": "proj-carb", "teamId": "carb-dp" }],
   "products": [{ "id": "prod-a", "name": "Product A", "color": "#3B82F6" }],
   "projectProducts": [{ "projectId": "proj-carb", "productId": "prod-a" }],
+  "iterationPlans": [{ "id": "plan-carb-2026", "name": "CARB ART 2026", "methodology": "safe" }],
+  "timeboxes": [{ "id": "26.3", "planId": "plan-carb-2026", "name": "PI 26.3", "startDate": "2026-08-05", "endDate": "2026-11-03", "sortOrder": 1 }],
+  "sprints": [{ "id": "26.3.1", "timeboxId": "26.3", "number": 1, "name": "26.3.1", "type": "development", "startDate": "2026-08-05", "endDate": "2026-08-25", "weekCount": 3 }],
+  "projectIterationPlans": [{ "projectId": "proj-carb", "planId": "plan-carb-2026" }],
   "features": [{
-    "id": "F-1042",
+    "id": 1,
     "projectId": "proj-carb",
     "teamId": "carb-dp",
     "productId": "prod-a",
     "name": "Terminal Report",
+    "planningStatus": "planned",
     "assignmentStatus": "ok",
     "startDate": "2026-05-06",
     "targetDate": "2026-06-20",
+    "storyPoints": 13,
+    "notes": "",
+    "dependsOn": [3],
+    "comments": [{
+      "id": "c-1",
+      "author": "Franklin",
+      "text": "Waiting on API contract.",
+      "createdAt": "2026-08-07T12:00:00Z"
+    }],
     "sortOrder": 0
   }],
   "timelineMarkers": [{
@@ -516,6 +779,23 @@ docs/             Project documentation
     "color": "#EF4444",
     "createdAt": "...",
     "updatedAt": "..."
+  }],
+  "formattingRules": [{
+    "id": "rule-overdue",
+    "projectId": "proj-carb",
+    "name": "Overdue",
+    "enabled": true,
+    "matchMode": "all",
+    "conditions": [{ "field": "target_date", "operator": "lt_today" }, { "field": "completed", "operator": "is_false" }],
+    "actions": [{ "type": "left_border", "value": "#EF4444" }, { "type": "row_icon", "value": "clock" }]
+  }, {
+    "id": "rule-completed-overdue",
+    "projectId": "proj-carb",
+    "name": "Completed overdue",
+    "enabled": true,
+    "matchMode": "all",
+    "conditions": [{ "field": "target_date", "operator": "lt_today" }, { "field": "completed", "operator": "is_true" }],
+    "actions": [{ "type": "left_border", "value": "#F59E0B" }]
   }],
   "auditEvents": []
 }
@@ -578,45 +858,103 @@ Composite primary key: `(project_id, team_id)`.
 
 Composite primary key: `(project_id, product_id)`. A product may be assigned to multiple projects.
 
-### `program_increments`
+### `iteration_plans`
 
 | Column | Type | Notes |
 |--------|------|-------|
-| id | text | Primary key (e.g. `26.2`) |
+| id | text | Primary key (e.g. `plan-1`) |
+| name | text | Display name (e.g. `CARB ART 2026`) |
+| methodology | text | `safe` (v1); future methodologies allowed |
+| created_at | text | ISO timestamp |
+
+### `project_iteration_plans`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| project_id | text | FK → projects (unique — one plan per project) |
+| plan_id | text | FK → iteration_plans |
+
+### `program_increments` (timeboxes)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | text | Primary key |
+| plan_id | text | FK → iteration_plans |
 | name | text | Display name (e.g. `PI 26.2`) |
 | start_date | text | ISO date |
 | end_date | text | ISO date |
+| sort_order | integer | Display order within plan |
 | holiday_count | integer | Optional; informational only |
 
 ### `sprints`
 
 | Column | Type | Notes |
 |--------|------|-------|
-| id | text | Primary key (e.g. `26.2.1`) |
-| pi_id | text | FK → program_increments |
-| number | integer | 1–4 |
-| type | text | `development`, `innovation`, `planning` (week 4 of IP) |
+| id | text | Primary key |
+| timebox_id | text | FK → program_increments |
+| number | integer | 1–4 for SAFe |
+| name | text | Display name (e.g. `26.2.1`) |
+| type | text | Free text (defaults `DEVELOPMENT` / `INNOVATION` from SAFe template) |
+| scale | text | `day` \| `week` \| `month` — Gantt leaf granularity for this sprint |
 | start_date | text | ISO date |
 | end_date | text | ISO date |
-| week_count | integer | 3 or 1 (planning week stored separately if needed) |
+| week_count | integer | Weeks in the sprint (used for SAFe date span) |
 
 ### `features`
 
 | Column | Type | Notes |
 |--------|------|-------|
-| id | text | Primary key (e.g. `F-1042`) |
+| id | integer | Primary key; auto-increment identity (1, 2, 3…) |
 | project_id | text | FK → projects |
-| team_id | text | FK → teams |
+| team_id | text | FK → teams; nullable when `planning_status = backlog` |
 | product_id | text | FK → products |
 | name | text | Display name |
+| planning_status | text | `backlog` or `planned` |
 | assignment_status | text | `ok` or `team_unassigned` |
-| start_date | text | ISO date (YYYY-MM-DD) |
-| target_date | text | ISO date (YYYY-MM-DD) |
+| start_date | text | ISO date (YYYY-MM-DD); nullable in backlog |
+| target_date | text | ISO date (YYYY-MM-DD); nullable in backlog |
 | story_points | integer | Sum of US points; auto-calculated; informational |
+| notes | text | Free-text annotation (~500 chars); nullable |
 | completed | boolean | Default false |
 | cross_pi | boolean | Default false |
-| sort_order | integer | Row order in the Gantt |
+| sort_order | integer | Row order in the feature panel |
 | ado_work_item_id | integer | Nullable; for future ADO link |
+| created_at | text | ISO timestamp |
+| updated_at | text | ISO timestamp |
+
+### `feature_dependencies`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | integer | Primary key |
+| feature_id | integer | FK → features (dependent) |
+| depends_on_id | integer | FK → features (predecessor) |
+| created_at | text | ISO timestamp |
+
+Unique constraint: `(feature_id, depends_on_id)`.
+
+### `feature_comments`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | text | Primary key |
+| feature_id | integer | FK → features |
+| author | text | Actor display name |
+| text | text | Comment body (max 500 chars) |
+| created_at | text | ISO timestamp |
+| updated_at | text | ISO timestamp; nullable |
+
+### `formatting_rules`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | text | Primary key |
+| project_id | text | FK → projects |
+| name | text | Display name |
+| enabled | boolean | Default true |
+| conditions | text | JSON array of condition objects |
+| actions | text | JSON array of action objects |
+| sort_order | integer | Evaluation order (all matching rules apply) |
 | created_at | text | ISO timestamp |
 | updated_at | text | ISO timestamp |
 
@@ -625,7 +963,7 @@ Composite primary key: `(project_id, product_id)`. A product may be assigned to 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | integer | Primary key |
-| feature_id | text | FK → features |
+| feature_id | integer | FK → features |
 | start_date | text | Frozen start date |
 | target_date | text | Frozen target date |
 | frozen_at | text | ISO timestamp |
@@ -636,7 +974,7 @@ Composite primary key: `(project_id, product_id)`. A product may be assigned to 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | integer | Primary key |
-| feature_id | text | FK → features |
+| feature_id | integer | FK → features |
 | title | text | US title |
 | story_points | integer | Points for this US |
 | sort_order | integer | Display order |
@@ -647,7 +985,7 @@ Composite primary key: `(project_id, product_id)`. A product may be assigned to 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | integer | Primary key |
-| feature_id | text | FK → features (nullable for PI-wide events) |
+| feature_id | integer | FK → features (nullable for PI-wide events) |
 | event_type | text | e.g. `feature.moved`, `baseline.frozen` |
 | actor | text | Display name |
 | reason | text | Nullable; required on move (TBD) |
@@ -672,6 +1010,9 @@ Composite primary key: `(project_id, product_id)`. A product may be assigned to 
 | `POST /api/pi/:id/baseline` | Freeze baseline for all features in a PI |
 | `GET /api/features/:id/history` | Audit events for a feature |
 | `GET/POST/PATCH/DELETE /api/features/:id/user-stories` | CRUD user stories |
+| `GET/POST/PATCH/DELETE /api/features/:id/comments` | CRUD feature comments |
+| `GET/POST/DELETE /api/features/:id/dependencies` | Manage feature dependencies |
+| `GET/POST/PATCH/DELETE /api/projects/:id/formatting-rules` | CRUD formatting rules |
 | `GET/POST/PATCH/DELETE /api/products` | Manage products per project |
 
 Auth: TBD when backend is introduced. Actor name sent as a request header or body field.
@@ -684,13 +1025,13 @@ These were not explicitly discussed but are assumed unless changed:
 
 | Topic | Default |
 |-------|---------|
-| Architecture (MVP 1.5) | Frontend-only SPA, no backend |
+| Architecture | Frontend-only SPA, no backend (through MVP 2) |
 | Data persistence | `localStorage` — projects, teams, products, features, baselines, audit events, layout |
-| Actor storage | `localStorage` key `chronova-actor` |
+| User display name | `localStorage` key `chronova-actor` (UI label **User**; audit field `actor`) |
 | Left column width | Default 280px; min 200px, max 720px; collapsed 52px; persisted in `localStorage` |
 | Sidebar | Collapsible; state persisted |
 | Move reason | **TBD (MVP 2)** — required or optional |
-| Date granularity on Gantt | Week-level positioning; day is display-only |
+| Date granularity on Gantt | Per-sprint leaf scale (`day` \| `week` \| `month`); feature dates remain ISO source of truth |
 | PI display | Continuous horizontal scroll; dynamic weeks when no PI configured |
 | Re-freeze individual baseline | **TBD (MVP 2)** |
 | Recent history in panel | Last 20 events per feature |
@@ -709,16 +1050,19 @@ What the codebase already validates:
 | Timeline header (PIs, sprints, weeks) | Done — Planning week distinction pending |
 | Feature rows with status dot and deviation | Done |
 | Gantt bars with color and completion | Done |
-| Drag & drop (bars and rows) | Done — includes team change on section drop |
-| Current/Baseline toggle | UI only — comparison logic in MVP 2; markers visible in both |
+| Drag & drop (bars and rows) | Done — includes team change on section drop; blocked when feature is Delivered |
 | Footer summary | Done |
 | Seed data (3 PIs: 26.2–26.4) | Done |
 | Add Feature modal | Done |
-| Feature detail panel (dates, US) | Done — closes on outside click |
+| Feature detail panel | Done — compact layout; Delivered locks dates; Comments/History at end |
 | Client-side persistence (`localStorage`) | Done |
-| Actor name setup | Done |
+| User display name (sidebar) | Done — no blocking modal on app load |
+| Home landing + brand chrome | Done — TimeHorizon, BrandWordmark, pillars |
+| Onboarding: product tour | Done — `app-intro`, spotlight, real navigation |
+| Onboarding: setup wizard + Gantt checklist | Done — `setupProjectForGantt`, `ganttReadiness` |
+| Navigation memory (Home vs last page) | Done — `chronova-navigation` |
 | Project hierarchy + navigation | Done |
-| Collapsible sidebar with management pages | Done |
+| Collapsible sidebar with grouped nav | Done — Home · Timeline · Configuration |
 | Team view toggle (All / Single) | Done |
 | Assignment status icons | Done |
 | Product CRUD + color picker | Done |
@@ -728,8 +1072,10 @@ What the codebase already validates:
 | Timeline scroll position memory | Done — per project, on timeline exit |
 | Plan markers (Gantt settings) | Done |
 | Drag → team reassignment | Done |
-| Dynamic week calendar | **Not started** |
-| Baseline / ghost bars / functional history | MVP 2 |
+| Dynamic week calendar | Phase A done (from iteration plan); infinite empty scroll deferred |
+| MVP 1.6 (backlog, comments, rules, dependencies) | Done |
+| MVP 1.7 (dates UX, View, collapsible sections, rule builder) | Done |
+| Baseline / ghost bars / functional history | MVP 2 (blocked on MVP 1.7) |
 
 ---
 
@@ -750,7 +1096,7 @@ Replace Excel with a usable **frontend-only** web tool. All data persists in the
 
 > **MVP 1 scope is frozen and implemented.**
 
-### MVP 1.5 — Project hierarchy, navigation, and UX (current focus)
+### MVP 1.5 — Project hierarchy, navigation, and UX (complete)
 
 **Frontend-only. No backend, API, database, or integrations.**
 
@@ -763,17 +1109,17 @@ Application structure, navigation, and organizational model. Builds on MVP 1.
 | 3 | **Team CRUD + assignment** | Global team registry; assign/unassign teams to projects |
 | 4 | **Multiple teams per project** | 1..N teams per project |
 | 5 | **Team view toggle** | `All teams` (grouped sections) / `Single team` (filter) |
-| 6 | **Project → Team → Feature** | Every feature has project + team + product; traceable in UI and audit |
+| 6 | **Project → Team → Feature** | Every planned feature has project + team + product; traceable in UI and audit |
 | 7 | **Assignment status + icons** | `team_unassigned` / `project_unassigned` with alert icon and tooltip |
 | 8 | **Needs reassignment section** | At bottom in Single team view; bar positions unchanged |
 | 9 | **Products per project** | Global product catalog; assigned to projects via `project_products`; shared across teams |
 | 10 | **Product CRUD + color picker** | Create, rename, recolor (hex + native picker); delete blocked if features exist |
 | 11 | **Orphaned products** | On empty project delete, products become `project_unassigned` |
-| 12 | **Collapsible sidebar navigation** | Pages: Timeline, Projects, Teams, Products |
+| 12 | **Collapsible sidebar navigation** | Pages: **Home**, Timeline, Projects, Iterations, Teams, Products (grouped); User field in sidebar |
 | 13 | **Resizable feature panel** | Left Gantt column draggable; width persisted in `localStorage` |
 | 14 | **Full feature name visibility** | Names expand as panel widens; no truncate-only when space allows |
 | 15 | **Edit feature name** | Editable in detail panel; immediate update in list and bar |
-| 16 | **Dynamic week calendar** | PIs/Sprints in header; dynamic weeks when no PI configured |
+| 16 | **Dynamic week calendar** | **Phase A done** — calendar from assigned iteration plan; infinite empty scroll still deferred |
 | 17 | **Today marker** | **TODAY** pill in shared header row + vertical line at current day; not editable |
 | 18 | **Timeline scroll memory** | Per-project scroll saved on leaving Timeline (not F5); Today-centered default |
 | 19 | **Plan markers** | Gantt Settings modal; per-project markers (date, label, color); scroll on create |
@@ -781,42 +1127,76 @@ Application structure, navigation, and organizational model. Builds on MVP 1.
 | 21 | **Detail panel dismiss** | Click outside timeline feature area closes detail panel |
 | 22 | **Split-pane Gantt layout** | Shared header row (Features + timeline); bodies scroll in sync; horizontal header scroll synced with Gantt; resize at any scroll position |
 
-**Remaining in MVP 1.5:**
+> **MVP 1.5 scope is complete** except dynamic calendar (item 16), which may ship alongside MVP 1.6.
 
-- Dynamic calendar — infinite week scroll when no PI configured
+### MVP 1.6 — Planning enhancements (complete)
 
-**Implementation order (updated):**
+**Frontend-only.** Implements feedback from the Excel workflow refinement (August 2026).
 
-1. Data foundation — entities, `localStorage`, migration, assignment status ✅
-2. Sidebar + navigation — collapsible, management pages ✅
-3. Timeline behavior — project context, team toggle, grouped sections, reassignment ✅
-4. Product/team CRUD — color picker, orphan handling ✅
-5. UX polish — split-pane panel, name visibility, edit feature name ✅
-6. Timeline enhancements — Today marker, scroll memory, plan markers, drag team change ✅
-7. Dynamic calendar — infinite week scroll when no PI configured
+| Phase | Features | Status |
+|-------|----------|--------|
+| **A** | Story points on row/bar; marker grouping; comments + notes | Done |
+| **B** | Backlog (no team, optional dates) | Done |
+| **C** | Formatting rules (overdue default); feature dependencies | Done |
+| **D** | Dependency SVG connectors | Out of scope |
 
-### Post-MVP1 backlog
+| # | Feature | Status |
+|---|---------|--------|
+| 1 | Story points on feature row | Done |
+| 2 | Backlog features | Done |
+| 3 | Missing dates indicator | Done |
+| 4 | Assign team from backlog | Done (refined in MVP 1.7) |
+| 5 | Feature notes | Done |
+| 6 | Feature comments | Done |
+| 7 | Marker grouping | Done |
+| 8 | Formatting rules (basic) | Done (builder in MVP 1.7) |
+| 9 | Feature dependencies | Done |
 
-Features identified from the Excel workflow. Ordered by priority. Not part of MVP 1.5 unless explicitly pulled in.
+### MVP 1.7 — Timeline UX and rules builder (complete)
+
+**Frontend-only. Single batch — must complete before MVP 2.** Implement in phases; validate acceptance criteria per phase before moving on.
+
+Refinement: August 2026 (post-MVP 1.6 feedback).
+
+**Implementation order:**
+
+| Phase | Feature | Acceptance criteria |
+|-------|---------|---------------------|
+| **1** | **Dates UX** | Backlog create with empty dates; planned create with PI-pre-filled required dates; clear dates on edit → no bar + icon; assign team blocked inline without dates; footer counts valid Gantt bars only |
+| **2** | **View filter** | Sidebar label **View**; options **All → Backlog → teams**; Backlog view filters only; team view + Needs reassignment; full CRUD in all views; `viewMode` replaces `teamViewMode` |
+| **3** | **Collapsible sections** | Chevron on all sections; sync panel + Gantt; Collapse all / Expand all; `collapsedSections` per project in `localStorage` |
+| **4** | **Rule builder** | Editable conditions (field + operator + value) and actions per rule; `name` conditions; pre-installed **Overdue** and **Completed overdue** rules |
+| **5** | **Feature name** | Editable in detail panel only (verify existing behavior; no inline row edit) |
+
+**Exit criteria (MVP 1.7 complete):**
+
+- [x] All 5 phases passing acceptance criteria
+- [x] `localStorage` migration: `viewMode`, `collapsedSections`; deprecate `teamViewMode`
+- [x] `docs/project.md` reflects shipped behavior
+
+### Post-MVP1.7 backlog
+
+Features identified but **not** in MVP 1.6. Ordered by priority.
 
 | Priority | Feature | Description | Rationale |
 |----------|---------|-------------|-----------|
-| 1 | **Feature notes** | Free-text field per feature (`notes`, ~500 chars). Note icon on row when non-empty; editable in detail panel. | Direct replacement for Excel cell comments; low effort, high value. |
+| 1 | **Gantt zoom UX polish** | Global scale control / denser day layout; per-sprint scale already supported | Optional enhancement on top of per-sprint `scale` |
 | 2 | **Delivery commitment (star)** | Optional flag: "Product delivery date". Star icon at target date on the bar. Toggle in create modal and detail panel. | Core Excel convention; communicates executive delivery commitment. |
-| 3 | ~~**Today marker**~~ | **Moved to MVP 1.5** — implemented | — |
-| 4 | ~~**Timeline milestones**~~ | **Moved to MVP 1.5** as **Plan markers** — implemented via Gantt Settings | — |
-| 5 | **Bar labels and hover** | Feature name truncated inside bar; hover shows start date, target date, and notes preview. | Visual polish; complements notes and dates already on features. |
-| 6 | **Filter: delivery commitments** | Toggle or filter to show only features with delivery star. | Useful once delivery commitment exists; depends on priority 2. |
-| 7 | **Milestone types / icons** | Optional icon or type per marker (planning, release, regulatory, etc.). | Clarifies marker meaning; build after basic markers work. |
-| 8 | **Gantt settings expansion** | Additional tabs in Settings modal (styles, filters, etc.) | Extensible shell already in place |
+| 3 | **Bar labels and hover** | Feature name truncated inside bar; hover shows start date, target date, and notes preview. | Visual polish; complements notes and dates already on features. |
+| 4 | **Filter: delivery commitments** | Toggle or filter to show only features with delivery star. | Useful once delivery commitment exists; depends on priority 2. |
+| 5 | **Milestone types / icons** | Optional icon or type per marker (planning, release, regulatory, etc.). | Clarifies marker meaning; build after basic markers work. |
+| 6 | **Dependency SVG connectors** | Curved lines between related bars on feature select | Deferred from MVP 1.6; highlight + list is sufficient for v1 |
+| 7 | **Gantt settings expansion** | Additional tabs (filters, export prefs, etc.) | Extensible shell already in place |
+| 8 | **Formatting rule preview** | "Matches N features" preview in rule builder | Deferred from MVP 1.7 |
 
-**Explicitly not planned (post-MVP1):**
+**Explicitly not planned:**
 
-- Free-form text boxes on the Gantt canvas (Excel-style arbitrary annotations) — structured milestones cover the main use case with less maintenance.
+- Free-form text boxes on the Gantt canvas (Excel-style arbitrary annotations) — structured milestones and notes cover the main use case.
+- Nested comment replies — flat thread only in v1.
 
 ### MVP 2 — Baseline, history, and deviations (frontend-only)
 
-> **To be refined** in a future session. Identified scope below; details (move-reason rules, re-freeze) pending.
+> **Blocked until MVP 1.7 is complete.** To be refined in a future session. Identified scope below; details (move-reason rules, re-freeze) pending.
 
 Build on MVP 1.5 without adding a backend:
 
@@ -854,12 +1234,23 @@ Build on MVP 1.5 without adding a backend:
 | 9 | Export for meetings | Resolved (not in v1) |
 | 10 | Tool integrations | Resolved (ADO in MVP 4, not priority) |
 | 11 | Cross-PI features | Resolved |
-| 12 | How to create features? | Resolved (modal: team, product, start date, target date) |
+| 12 | How to create features? | Resolved (modal: team optional for backlog, product required, dates optional in backlog) |
 | 13 | Feature positioning model | Resolved (dates → weeks; day display-only) |
 | 14 | PI display on Gantt | Resolved (continuous scroll; dynamic weeks when unconfigured) |
-| 15 | Move reason: required or optional? | Open — refine in MVP 2 |
-| 16 | Re-freeze baseline for individual feature? | Open — refine in MVP 2 |
-| 17 | Backend, database, and hosting stack? | Deferred — MVP 3; see [free-hosting-proposal.md](./free-hosting-proposal.md) |
+| 15 | Backlog vs team_unassigned | Resolved (backlog = no team, no bar; team_unassigned = broken assignment, bar preserved) |
+| 16 | Story points visibility | Resolved (row badge + bar suffix when space; planned features only in footer) |
+| 17 | Comments vs notes | Resolved (separate fields; flat comment thread; notes = single annotation) |
+| 18 | Formatting rules scope | Resolved (per project; all rules apply; overdue default disableable; day-level) |
+| 19 | Feature dependencies | Resolved (depends on only; highlight + list; no SVG in MVP 1.6) |
+| 20 | Marker grouping | Resolved (generic pill; expand to header labels + popover; single body line) |
+| 21 | Optional dates + team assign gate | Resolved — team selectable while editing; dates required on Save when team assigned |
+| 22 | View filter (All / Backlog / Team) | Resolved (MVP 1.7 — replaces Team view) |
+| 23 | Collapsible sections | Resolved (MVP 1.7 — all sections + collapse/expand all) |
+| 24 | Rule criteria builder | Resolved (MVP 1.7 — editable conditions; Completed overdue rule) |
+| 25 | Feature name edit | Resolved (detail panel only; no inline row edit) |
+| 26 | Move reason: required or optional? | Open — refine in MVP 2 |
+| 27 | Re-freeze baseline for individual feature? | Open — refine in MVP 2 |
+| 28 | Backend, database, and hosting stack? | Deferred — MVP 3; see [free-hosting-proposal.md](./free-hosting-proposal.md) |
 
 ---
 
@@ -868,10 +1259,21 @@ Build on MVP 1.5 without adding a backend:
 | Term | Definition |
 |------|------------|
 | **Project** | Primary organizational unit — all features belong to a project; multiple teams can be assigned |
-| **Team** | Global registry of teams; assigned to one or more projects; each feature belongs to one team |
+| **Team** | Global registry of teams; assigned to one or more projects; planned features belong to one team |
 | **Product** | Global identification label (name + color); assigned to projects via `project_products` — not an epic or backlog parent |
+| **Planning status** | `backlog` or `planned` — whether the feature appears on the Gantt timeline |
+| **Backlog** | Features without a team; listed in the feature panel only; no Gantt bar |
 | **Assignment status** | `ok` or `team_unassigned` / `project_unassigned` — indicates broken entity relationships |
-| **Needs reassignment** | UI section for features whose team is no longer assigned to the project |
+| **Needs reassignment** | UI section for planned features whose team is no longer assigned to the project |
+| **Notes** | Single free-text annotation per feature (~500 chars); distinct from comments |
+| **Comments** | Flat discussion thread per feature with author and timestamp |
+| **Formatting rule** / **Rule** | Per-project condition → visual action rule evaluated against feature fields; UI tab labeled **Rules** |
+| **Depends on** | Unidirectional dependency link between features in the same project |
+| **Overdue** | Formatting rule: `target_date < today` and `completed = false` |
+| **Completed overdue** | Feature delivered (`completed = true`) after `target_date` |
+| **View** | Timeline sidebar filter: All, Backlog, or a single team |
+| **Collapsed section** | Team, Backlog, or Needs reassignment block hidden in panel and Gantt |
+| **Valid Gantt bar** | Feature with team + start date + target date — used for footer counts |
 | **PI** | Program Increment — ~3-month planning and execution cycle (4 sprints) |
 | **SAFe** | Scaled Agile Framework |
 | **IP** | Innovation Sprint — 4th sprint of the PI (3 weeks innovation + 1 week planning) |
@@ -886,7 +1288,10 @@ Build on MVP 1.5 without adding a backend:
 | **Deviation** | Difference between current and baseline dates (at week granularity) |
 | **Cross-PI** | Feature spanning more than one Program Increment |
 | **SP** | Story Points — effort estimation unit |
-| **Actor** | Person who made a change (simple name, no login) |
+| **User** | Display name of the person making changes (UI); stored as `chronova-actor`; audit field `actor` |
+| **Product tour** | Guided spotlight walkthrough (`app-intro`); extensible via `src/tours/registry.js` |
+| **Setup wizard** | Multi-step flow to create project, calendar, team, and first Gantt feature |
+| **Gantt-ready** | Project has plan/timebox, product, and team — can add planned features to the Timeline |
 
 ---
 
@@ -897,8 +1302,11 @@ Build on MVP 1.5 without adding a backend:
 | [project.md](./project.md) | Product definition, behavior, data shapes (this file) |
 | [project-def-example.md](./project-def-example.md) | Reference template for this document's structure |
 | Data model & API sections | Future MVP 3 reference — not current implementation scope |
-| [MVP 1.5](#mvp-15--project-hierarchy-navigation-and-ux-current-focus) | Current implementation focus |
-| [Post-MVP1 backlog](#post-mvp1-backlog) | Prioritized features after MVP 1.5 (notes, delivery star, milestones, etc.) |
+| [MVP 1.5](#mvp-15--project-hierarchy-navigation-and-ux-complete) | Project hierarchy and navigation (complete) |
+| [MVP 1.6](#mvp-16--planning-enhancements-complete) | Planning enhancements (complete) |
+| [MVP 1.7](#mvp-17--timeline-ux-and-rules-builder-complete) | Timeline UX and rules builder (complete) |
+| [MVP 2](#mvp-2--baseline-history-and-deviations-frontend-only) | Next implementation focus |
+| [Post-MVP1.7 backlog](#post-mvp17-backlog) | Prioritized features after MVP 1.7 |
 | [free-hosting-proposal.md](./free-hosting-proposal.md) | $0 hosting stack for MVP 3 (backend + persistence) |
 
 ---
@@ -920,3 +1328,14 @@ Build on MVP 1.5 without adding a backend:
 | 2026-08-07 | Split-pane Gantt layout; Today marker; timeline scroll memory; plan markers via Gantt Settings; drag-to-reassign team; detail panel dismiss on outside click |
 | 2026-08-07 | UI polish: TODAY uppercase; settings icon in TopNav; shared header row (Features + timeline) for row alignment |
 | 2026-08-07 | Documentation pass: align product model, panel widths, scroll memory, and shared-header layout with implementation |
+| 2026-08-07 | MVP 1.6 defined: backlog features, SP visibility, notes, comments, formatting rules, dependencies, marker grouping; refinement decisions from Excel workflow feedback |
+| 2026-08-08 | Detail panel: explicit Save with draft state; unsaved-changes dialog; team/dates validated on save |
+| 2026-08-08 | Rules UX polish: tab renamed to Rules; AND/OR matchMode; all rules deletable; row-icon tooltips; alert-triangle fix; marker group expand shows popover only |
+| 2026-08-08 | MVP 1.7 implemented: dates UX, View filter, collapsible sections, rule builder, Completed overdue rule; MVP 1.7 marked complete |
+| 2026-08-08 | Feature ID: auto-generated integer identity on save; custom ID input removed; legacy `F-*` migrated |
+| 2026-08-08 | **Iterations Phase A:** reusable iteration plans (SAFe PIs/sprints); one plan per project; timeline calendar derived from plan; current timebox = contains today |
+| 2026-08-08 | Iterations UX: project assign only on Projects; Create iteration; sprint name/type/scale (day/week/month); remove Current/Baseline + breadcrumb; Plan label on Timeline; single page titles |
+| 2026-08-09 | **Home** landing: TimeHorizon, BrandWordmark, sidebar groups (Home · Timeline · Configuration) |
+| 2026-08-09 | **Onboarding:** product tour (`app-intro`), setup wizard, Gantt checklist, `ganttReadiness`, `setupProjectForGantt`; navigation memory (`chronova-navigation`) |
+| 2026-08-09 | UI: User label in sidebar (replaces Actor modal); feature panel UX polish; Delivered locks dates; dependency ID normalization |
+| 2026-08-09 | First-visit **Take a tour** CTA highlight on Home |

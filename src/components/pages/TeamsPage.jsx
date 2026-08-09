@@ -39,7 +39,6 @@ export default function TeamsPage({
 
   return (
     <div className="flex-1 overflow-y-auto bg-white p-6">
-      <h1 className="mb-1 text-xl font-semibold text-gray-900">Teams</h1>
       <p className="mb-6 text-sm text-gray-500">
         Global team registry. Assign teams to the active project.
       </p>

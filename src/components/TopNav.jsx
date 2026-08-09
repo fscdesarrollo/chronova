@@ -2,50 +2,37 @@ import { Plus, Settings } from 'lucide-react'
 
 export default function TopNav({
   pageTitle,
-  viewMode,
-  onViewModeChange,
-  projectName,
+  planLabel,
   onAddFeature,
   onOpenGanttSettings,
   showAddFeature = true,
+  showPlanLabel = false,
+  variant = 'light',
+  addFeatureDisabled = false,
+  addFeatureHint,
 }) {
+  const isDark = variant === 'dark'
+
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-6">
+    <header
+      className={`flex h-14 shrink-0 items-center justify-between border-b px-6 ${
+        isDark
+          ? 'border-white/10 bg-[#12182a]/95 text-white backdrop-blur-sm'
+          : 'border-gray-200 bg-white'
+      }`}
+    >
       <div>
-        <p className="text-xs text-gray-500">
-          {projectName} / <span className="text-gray-700">PI 26.2 – 26.4</span>
-        </p>
-        <h1 className="text-lg font-semibold text-gray-900">{pageTitle}</h1>
+        <h1 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+          {pageTitle}
+        </h1>
+        {showPlanLabel && planLabel && (
+          <p className="text-xs text-gray-500">
+            Plan: <span className="text-gray-700">{planLabel}</span>
+          </p>
+        )}
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 p-0.5">
-          <button
-            type="button"
-            onClick={() => onViewModeChange('current')}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              viewMode === 'current'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <span className="h-2 w-2 rounded-full bg-blue-500" />
-            Current
-          </button>
-          <button
-            type="button"
-            onClick={() => onViewModeChange('baseline')}
-            title="Available in MVP 2"
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              viewMode === 'baseline'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Baseline
-          </button>
-        </div>
-
         {showAddFeature && (
           <>
             <button
@@ -59,7 +46,12 @@ export default function TopNav({
             <button
               type="button"
               onClick={onAddFeature}
-              className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-violet-700"
+              title={addFeatureHint}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors ${
+                addFeatureDisabled
+                  ? 'cursor-not-allowed bg-violet-400 opacity-80'
+                  : 'bg-violet-600 hover:bg-violet-700'
+              }`}
             >
               <Plus size={16} />
               Add Feature

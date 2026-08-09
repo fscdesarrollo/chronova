@@ -25,3 +25,336 @@ body {
   background: #c1c1c1;
   border-radius: 4px;
 }
+
+.brand-wordmark {
+  position: relative;
+  display: inline-block;
+  isolation: isolate;
+  color: transparent;
+  font-family: 'Arial Black', 'Segoe UI Black', sans-serif;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.065em;
+  line-height: 0.95;
+  text-transform: uppercase;
+  filter: drop-shadow(0 0 14px rgba(139, 92, 246, 0.3));
+}
+
+.brand-wordmark__text {
+  display: inline-block;
+  background:
+    linear-gradient(
+      92deg,
+      #ffffff 0%,
+      #ddd6fe 34%,
+      #a78bfa 58%,
+      #e0e7ff 78%,
+      #ffffff 100%
+    );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 26px rgba(167, 139, 250, 0.18);
+}
+
+.brand-wordmark::before,
+.brand-wordmark::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.brand-wordmark::before {
+  color: #67e8f9;
+  text-shadow: -5px 0 9px rgba(34, 211, 238, 0.75);
+  clip-path: inset(12% 0 62% 0);
+  animation: chronova-signal-top 5.4s steps(1, end) infinite;
+}
+
+.brand-wordmark::after {
+  color: #c084fc;
+  text-shadow: 5px 0 10px rgba(168, 85, 247, 0.8);
+  clip-path: inset(61% 0 12% 0);
+  animation: chronova-signal-bottom 5.4s steps(1, end) 0.08s infinite;
+}
+
+.brand-wordmark__particles {
+  position: absolute;
+  inset: -22% -6%;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.brand-wordmark__particles i {
+  position: absolute;
+  left: var(--particle-x);
+  top: var(--particle-y);
+  width: 0.08em;
+  height: 0.08em;
+  background: #c4b5fd;
+  box-shadow:
+    0.14em 0 #67e8f9,
+    -0.12em 0.08em #8b5cf6;
+  opacity: 0;
+  animation: chronova-particle var(--particle-duration) ease-out var(--particle-delay) infinite;
+}
+
+.brand-wordmark--compact {
+  font-style: normal;
+  letter-spacing: 0.08em;
+  filter: drop-shadow(0 0 5px rgba(139, 92, 246, 0.25));
+}
+
+.brand-wordmark--compact::before,
+.brand-wordmark--compact::after {
+  animation-duration: 8s;
+}
+
+@keyframes chronova-signal-top {
+  0%,
+  88%,
+  91%,
+  94%,
+  100% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+  89% {
+    opacity: 0.82;
+    transform: translateX(-0.09em);
+  }
+  90% {
+    opacity: 0.48;
+    transform: translateX(0.055em);
+  }
+  92% {
+    opacity: 0.72;
+    transform: translateX(-0.035em);
+  }
+  93% {
+    opacity: 0.35;
+    transform: translateX(0.02em);
+  }
+}
+
+@keyframes chronova-signal-bottom {
+  0%,
+  87%,
+  90%,
+  93%,
+  100% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+  88% {
+    opacity: 0.62;
+    transform: translateX(0.08em);
+  }
+  89% {
+    opacity: 0.32;
+    transform: translateX(-0.04em);
+  }
+  91% {
+    opacity: 0.78;
+    transform: translateX(0.05em);
+  }
+  92% {
+    opacity: 0.4;
+    transform: translateX(-0.025em);
+  }
+}
+
+@keyframes chronova-particle {
+  0%,
+  70% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.5);
+  }
+  74% {
+    opacity: 0.9;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0.45em, -0.5em) scale(0);
+  }
+}
+
+@keyframes tour-cta-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes tour-cta-scan {
+  0% {
+    transform: translateX(-120%) skewX(-12deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateX(220%) skewX(-12deg);
+    opacity: 0;
+  }
+}
+
+@keyframes tour-cta-badge-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes tour-cta-icon-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.tour-cta-highlight {
+  display: inline-flex;
+}
+
+.tour-cta-highlight__btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.tour-cta-highlight__scan {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 0.5rem;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(167, 139, 250, 0.35) 45%,
+    rgba(103, 232, 249, 0.5) 50%,
+    rgba(167, 139, 250, 0.35) 55%,
+    transparent 100%
+  );
+  animation: tour-cta-scan 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.tour-cta-highlight__ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 0.75rem;
+  pointer-events: none;
+}
+
+.tour-cta-highlight__ring--outer {
+  border: 1px solid rgba(139, 92, 246, 0.55);
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.35);
+  animation: tour-cta-pulse 2.4s ease-in-out infinite;
+}
+
+.tour-cta-highlight__ring--inner {
+  inset: -2px;
+  border: 1px solid rgba(103, 232, 249, 0.35);
+  animation: tour-cta-pulse 2.4s ease-in-out 0.4s infinite;
+}
+
+.tour-cta-highlight__badge {
+  position: absolute;
+  top: -1.65rem;
+  left: 50%;
+  z-index: 20;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  border-radius: 9999px;
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  background: rgba(18, 24, 42, 0.92);
+  padding: 0.2rem 0.65rem;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(196, 181, 253, 0.95);
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.4);
+  animation: tour-cta-badge-float 2.8s ease-in-out infinite;
+}
+
+.tour-cta-highlight__icon {
+  filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.8));
+  animation: tour-cta-icon-spin 8s linear infinite;
+}
+
+@keyframes horizon-grid-drift {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 48px 48px;
+  }
+}
+
+@keyframes horizon-today-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes horizon-bar-float {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateX(6px);
+    opacity: 1;
+  }
+}
+
+@keyframes horizon-particle {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.8;
+  }
+  90% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateX(120px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .time-horizon-motion,
+  .brand-wordmark::before,
+  .brand-wordmark::after,
+  .brand-wordmark__particles i,
+  .tour-cta-highlight__ring,
+  .tour-cta-highlight__scan,
+  .tour-cta-highlight__badge,
+  .tour-cta-highlight__icon {
+    animation: none !important;
+  }
+}
