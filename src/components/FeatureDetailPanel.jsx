@@ -47,6 +47,7 @@ const EVENT_LABELS = {
   'feature.renamed': 'Name updated',
   'feature.team_changed': 'Team changed',
   'feature.team_assigned': 'Team assigned',
+  'feature.product_changed': 'Product changed',
   'feature.comment_added': 'Comment added',
   'feature.comment_edited': 'Comment edited',
   'feature.comment_deleted': 'Comment deleted',
@@ -58,6 +59,7 @@ function draftFromFeature(feature) {
   if (!feature) {
     return {
       name: '',
+      productId: '',
       teamId: null,
       startDate: '',
       targetDate: '',
@@ -68,6 +70,7 @@ function draftFromFeature(feature) {
   }
   return {
     name: feature.name ?? '',
+    productId: feature.productId ?? '',
     teamId: feature.planningStatus === 'backlog' ? null : feature.teamId,
     startDate: feature.startDate ?? '',
     targetDate: feature.targetDate ?? '',
@@ -80,6 +83,7 @@ function draftFromFeature(feature) {
 function draftsEqual(a, b) {
   return (
     a.name === b.name &&
+    a.productId === b.productId &&
     a.teamId === b.teamId &&
     a.startDate === b.startDate &&
     a.targetDate === b.targetDate &&
@@ -95,6 +99,9 @@ function validateDraft(draft) {
   if (!draft.name.trim()) {
     errors.push('Name is required.')
   }
+  if (!draft.productId) {
+    errors.push('Product is required.')
+  }
   if (draft.teamId) {
     if (!draft.startDate) errors.push('Start date is required when a team is assigned.')
     if (!draft.targetDate) errors.push('Target date is required when a team is assigned.')
@@ -109,6 +116,7 @@ function buildUpdatePayload(draft) {
   const isBacklog = !draft.teamId
   return {
     name: draft.name.trim(),
+    productId: draft.productId,
     teamId: isBacklog ? null : draft.teamId,
     ...(isBacklog ? { planningStatus: 'backlog', assignmentStatus: 'ok' } : {}),
     startDate: draft.startDate || null,
@@ -123,6 +131,8 @@ const FeatureDetailPanel = forwardRef(function FeatureDetailPanel(
   {
     feature,
     history,
+    productsForProject,
+    allProducts,
     teamsForProject,
     allTeams,
     allFeatures,
@@ -177,11 +187,12 @@ const FeatureDetailPanel = forwardRef(function FeatureDetailPanel(
     }
     onEditPreviewChange?.({
       featureId: feature.id,
+      productId: draft.productId,
       teamId: draft.teamId,
       startDate: draft.startDate || null,
       targetDate: draft.targetDate || null,
     })
-  }, [draft.teamId, draft.startDate, draft.targetDate, feature?.id, onEditPreviewChange])
+  }, [draft.productId, draft.teamId, draft.startDate, draft.targetDate, feature?.id, onEditPreviewChange])
 
   useEffect(() => {
     return () => onEditPreviewChange?.(null)
@@ -252,6 +263,18 @@ const FeatureDetailPanel = forwardRef(function FeatureDetailPanel(
   const needsAlert = feature.assignmentStatus === 'team_unassigned'
   const teamSelectValue = draft.teamId ?? BACKLOG_VALUE
   const draftMissingDates = Boolean(draft.teamId && (!draft.startDate || !draft.targetDate))
+
+  const productOptions = (() => {
+    const options = [...(productsForProject ?? [])]
+    if (draft.productId && !options.some((p) => p.id === draft.productId)) {
+      const current = allProducts?.find((p) => p.id === draft.productId)
+      if (current) options.push(current)
+    }
+    return options
+  })()
+
+  const draftProductName =
+    productOptions.find((p) => p.id === draft.productId)?.name ?? feature.productName
 
   const teamOptions = (() => {
     const options = [...teamsForProject]
@@ -333,7 +356,7 @@ const FeatureDetailPanel = forwardRef(function FeatureDetailPanel(
               className="w-full rounded border border-transparent bg-transparent text-sm font-semibold text-gray-900 focus:border-violet-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-violet-500"
             />
             <p className="text-xs text-gray-400">
-              {feature.id} · {feature.productName}
+              {feature.id} · {draftProductName}
               {isDirty && <span className="ml-2 text-amber-600">· Unsaved changes</span>}
             </p>
           </div>
@@ -362,6 +385,22 @@ const FeatureDetailPanel = forwardRef(function FeatureDetailPanel(
           )}
 
           <section className="space-y-3 rounded-lg border border-gray-100 bg-gray-50/50 p-3">
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">Product</label>
+              <select
+                value={draft.productId}
+                onChange={(e) => {
+                  setDraft((prev) => ({ ...prev, productId: e.target.value }))
+                  setSaveErrors([])
+                }}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              >
+                {productOptions.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+
             <div>
               <label className="mb-1 block text-xs text-gray-500">Team</label>
               <select

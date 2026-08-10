@@ -298,6 +298,8 @@ export default function App() {
                 ref={detailPanelRef}
                 feature={timeline.selectedFeature}
                 history={history}
+                productsForProject={timeline.productsForProject}
+                allProducts={timeline.products}
                 teamsForProject={timeline.teamsForProject}
                 allTeams={timeline.teams}
                 allFeatures={timeline.allFeatures}

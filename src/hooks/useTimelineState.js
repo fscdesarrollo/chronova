@@ -76,6 +76,7 @@ function applyFeatureEditPreview(feature, preview, projectTeams) {
   const teamId = isBacklog ? null : preview.teamId
   return {
     ...feature,
+    ...(preview.productId !== undefined ? { productId: preview.productId } : {}),
     teamId,
     planningStatus: isBacklog ? 'backlog' : 'planned',
     assignmentStatus: isBacklog
@@ -515,6 +516,15 @@ export function useTimelineState() {
             createEvent('feature.renamed', actor, id, {
               previous: current.name,
               current: updates.name,
+            }),
+          )
+        }
+
+        if (updates.productId !== undefined && updates.productId !== current.productId) {
+          pendingEvents.push(
+            createEvent('feature.product_changed', actor, id, {
+              previous: current.productId,
+              current: updates.productId,
             }),
           )
         }
