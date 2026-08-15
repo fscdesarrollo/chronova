@@ -307,12 +307,6 @@ export default function App() {
                 onDeselectFeature={requestDeselectFeature}
                 highlightProductId={timeline.filterProductId}
                 onExtendRange={timeline.extendTimelineRange}
-                zoomLevel={timeline.timelineZoomLevel}
-                zoomLabel={timeline.timelineZoomLabel}
-                canZoomIn={timeline.canZoomTimelineIn}
-                canZoomOut={timeline.canZoomTimelineOut}
-                onZoomIn={timeline.zoomTimelineIn}
-                onZoomOut={timeline.zoomTimelineOut}
                 onScrollToToday={timeline.scrollToToday}
               />
               <Footer

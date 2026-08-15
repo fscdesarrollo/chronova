@@ -1,7 +1,8 @@
 import { ROW_HEIGHT, SECTION_ROW_HEIGHT } from '../constants'
 
 export function rowHeightFor(row) {
-  return row.type === 'section' ? SECTION_ROW_HEIGHT : ROW_HEIGHT
+  if (row.type === 'section') return SECTION_ROW_HEIGHT
+  return ROW_HEIGHT
 }
 
 export function visualRowTop(timelineRows, visualRowIndex) {
@@ -23,6 +24,11 @@ export function visualRowIndexFromY(timelineRows, y) {
 }
 
 export function findSectionForVisualIndex(timelineRows, visualRowIndex) {
+  const row = timelineRows[visualRowIndex]
+  if (row?.type === 'team-drop') {
+    return { type: 'section', id: row.sectionId }
+  }
+
   for (let i = visualRowIndex; i >= 0; i--) {
     if (timelineRows[i].type === 'section') return timelineRows[i]
   }

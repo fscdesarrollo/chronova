@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { FeatureBarRow, FeatureLabelRow } from './FeatureRow'
+import { createPortal } from 'react-dom'
+import { FeatureBarRow, FeatureDragRowGhost, FeatureLabelRow, TeamDropRow } from './FeatureRow'
 import FeaturePanelHeader from './FeaturePanelHeader'
 import TeamSectionHeader from './TeamSectionHeader'
 import TimelineHeader from './TimelineHeader'
 import { TodayBodyLine, TimelineMarkerBodyLine } from './TimelineMarkers'
 import { useFeatureDrag, ROW_HEIGHT } from '../hooks/useFeatureDrag'
 import { useLeftColResize } from '../hooks/useLeftColResize'
-import { LEFT_COL_COLLAPSED_WIDTH, SECTION_ROW_HEIGHT, WEEK_WIDTH } from '../constants'
+import { DAY_WIDTH, LEFT_COL_COLLAPSED_WIDTH, SECTION_ROW_HEIGHT, WEEK_WIDTH } from '../constants'
 import { loadTimelineView, saveTimelineView } from '../utils/storage'
 import {
   getDateTimelinePosition,
@@ -14,7 +15,6 @@ import {
   scrollLeftForToday,
 } from '../utils/weekCalendar'
 import { daysBetween, DYNAMIC_CALENDAR } from '../utils/dynamicCalendar'
-import { scaledDayWidth, zoomScale } from '../utils/timelineZoom'
 import { rowHeightFor } from '../utils/timelineLayout'
 import { buildGroupedMarkerLayout } from '../utils/markerGroups'
 import { evaluateFormattingRules } from '../utils/formattingRules'
@@ -49,12 +49,6 @@ export default function TimelineGrid({
   highlightProductId = null,
   emptyMessage = 'No features yet. Use "Add Feature" to get started.',
   onExtendRange,
-  zoomLevel = 1,
-  zoomLabel = 'Normal',
-  canZoomIn = false,
-  canZoomOut = false,
-  onZoomIn,
-  onZoomOut,
   onScrollToToday,
 }) {
   const weekCalendar = calendar?.weeks ?? []
@@ -70,7 +64,6 @@ export default function TimelineGrid({
   const shouldPersistViewRef = useRef(false)
   const extendingRangeRef = useRef(false)
   const prevRangeStartRef = useRef(null)
-  const prevZoomScaleRef = useRef(zoomScale(zoomLevel))
   const scrollPositionRef = useRef({ scrollLeft: 0, scrollTop: 0 })
   const [expandedMarkerDates, setExpandedMarkerDates] = useState(() => new Set())
   const [featureSearchQuery, setFeatureSearchQuery] = useState('')
@@ -85,7 +78,7 @@ export default function TimelineGrid({
   const { gridRef, rowsRef, drag, beginDrag } = useFeatureDrag(
     displayRows,
     onMove,
-    0,
+    effectiveColWidth,
     calendar,
   )
   const { startResize } = useLeftColResize({
@@ -180,27 +173,11 @@ export default function TimelineGrid({
     const prevStart = prevRangeStartRef.current
     if (prevStart && calendar.rangeStart < prevStart) {
       const daysAdded = daysBetween(calendar.rangeStart, prevStart)
-      applyScroll(grid.scrollLeft + daysAdded * scaledDayWidth(zoomLevel), grid.scrollTop)
+      applyScroll(grid.scrollLeft + daysAdded * DAY_WIDTH, grid.scrollTop)
       shouldPersistViewRef.current = true
     }
     prevRangeStartRef.current = calendar.rangeStart
-  }, [calendar?.rangeStart, applyScroll, gridRef, zoomLevel])
-
-  useEffect(() => {
-    const grid = gridRef.current
-    const newScale = zoomScale(zoomLevel)
-    const oldScale = prevZoomScaleRef.current
-    if (!grid || !scrollInitializedRef.current || newScale === oldScale) {
-      prevZoomScaleRef.current = newScale
-      return
-    }
-
-    const centerPx = grid.scrollLeft + grid.clientWidth / 2
-    const newScrollLeft = centerPx * (newScale / oldScale) - grid.clientWidth / 2
-    applyScroll(Math.max(0, newScrollLeft), grid.scrollTop)
-    shouldPersistViewRef.current = true
-    prevZoomScaleRef.current = newScale
-  }, [zoomLevel, applyScroll, gridRef])
+  }, [calendar?.rangeStart, applyScroll, gridRef])
 
   useEffect(() => {
     const grid = gridRef.current
@@ -249,9 +226,9 @@ export default function TimelineGrid({
   useEffect(() => {
     return () => {
       if (!shouldPersistViewRef.current) return
-      saveTimelineView(projectId, { ...scrollPositionRef.current, zoomLevel })
+      saveTimelineView(projectId, scrollPositionRef.current)
     }
-  }, [projectId, zoomLevel])
+  }, [projectId])
 
   const syncScrollTop = useCallback((source, target) => {
     if (!source || !target || scrollSyncRef.current) return
@@ -312,6 +289,16 @@ export default function TimelineGrid({
 
   return (
     <div data-timeline-split className="relative z-0 flex min-h-0 flex-1 flex-col">
+      {drag?.mode === 'row' &&
+        drag.rowGhostStyle &&
+        createPortal(
+          <FeatureDragRowGhost
+            feature={drag.feature}
+            rowGhostStyle={drag.rowGhostStyle}
+            collapsed={leftColCollapsed}
+          />,
+          document.body,
+        )}
       <div className="flex shrink-0 items-stretch">
         <div style={{ width: effectiveColWidth }}>
           <FeaturePanelHeader
@@ -323,11 +310,6 @@ export default function TimelineGrid({
             onSearchChange={setFeatureSearchQuery}
             searchInputRef={searchInputRef}
             onScrollToToday={onScrollToToday}
-            zoomLabel={zoomLabel}
-            canZoomIn={canZoomIn}
-            canZoomOut={canZoomOut}
-            onZoomIn={onZoomIn}
-            onZoomOut={onZoomOut}
           />
         </div>
         <div
@@ -341,8 +323,6 @@ export default function TimelineGrid({
             markerGroups={markerGroups}
             expandedMarkerDates={expandedMarkerDates}
             onToggleMarkerGroup={toggleMarkerGroup}
-            projectId={projectId}
-            features={allFeatures}
           />
         </div>
       </div>
@@ -381,6 +361,19 @@ export default function TimelineGrid({
                       onToggle={() => onToggleSectionCollapsed?.(row.id)}
                     />
                   )
+                }
+
+                if (row.type === 'team-drop') {
+                  if (leftColCollapsed) {
+                    return (
+                      <div
+                        key={row.id}
+                        className="border-b border-r border-gray-200 bg-gray-50"
+                        style={{ height: ROW_HEIGHT }}
+                      />
+                    )
+                  }
+                  return <TeamDropRow key={row.id} />
                 }
 
                 const feature = row.feature
@@ -440,6 +433,10 @@ export default function TimelineGrid({
                   )
                 }
 
+                if (row.type === 'team-drop') {
+                  return <TeamDropRow key={row.id} timelineWidth={timelineWidth} />
+                }
+
                 const feature = row.feature
                 const { isDimmed } = getRowVisualState(feature.id)
                 const formatting = evaluateFormattingRules(formattingRules, feature)
@@ -456,6 +453,7 @@ export default function TimelineGrid({
                     units={weekCalendar}
                     dragStyle={drag?.featureId === feature.id ? drag.barStyle : null}
                     onBarPointerDown={(e) => beginDrag(e, feature.id, 'bar', e.currentTarget)}
+                    onRowPointerDown={(e) => beginDrag(e, feature.id, 'row')}
                     onSelect={() => onSelectFeature(feature.id)}
                   />
                 )

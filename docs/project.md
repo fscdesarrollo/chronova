@@ -111,8 +111,7 @@ Sprint 1 ── Sprint 2 ── Sprint 3 ── IP (3 wks innovation) ── Pla
 | PIs configured | Timeline header shows PI → Sprint → Week in the plan range; generic day columns before and after |
 | No PI/Sprint configured | Dynamic **day** grid — today centered (±90 days initially); scroll loads ±30 days per edge; weekends shaded |
 | Horizontal navigation | Continuous infinite scroll; not limited to a fixed number of PIs |
-| Timeline zoom | 4 levels (Compact / Normal / Large / X-Large) in the feature panel header; scales day, week, and month columns globally; persisted per project |
-| Go to today | **Today** button in the feature panel header (mini icons when panel collapsed) centers the viewport on the current date |
+| Go to today | **Today** button in the feature panel header (mini icon when panel collapsed) centers the viewport on the current date |
 
 #### Organization: project, team, and product
 
@@ -805,7 +804,7 @@ src/
   components/pages/       Home, Projects, Iterations, Teams, Products
   tours/          Tour registry (`app-intro`; extensible per page)
   hooks/          useTimelineState, useFeatureDrag, useLeftColResize
-  utils/          dates, storage, navigation, onboarding, ganttReadiness, weekCalendar, dynamicCalendar, timelineZoom, migration, featureImport, …
+  utils/          dates, storage, navigation, onboarding, ganttReadiness, weekCalendar, dynamicCalendar, migration, featureImport, …
   data.js         Calendar seed (PI 26.2 onward); empty projects/teams/products/features
   constants.js    Layout dimensions and drag helpers
 docs/             Project documentation (project.md, brand.md, feature-import-example.csv)
@@ -1153,7 +1152,6 @@ What the codebase already validates:
 | Plan markers (Gantt settings) | Done |
 | Drag → team reassignment | Done |
 | Dynamic day calendar | Done — `dynamicCalendar.js`; today-centered ±90d; infinite scroll; weekend shading; SAFe plan merge |
-| Timeline zoom + Today | Done — `timelineZoom.js`; 4 levels; feature panel header controls; per-project persistence |
 | MVP 1.6 (backlog, comments, rules, dependencies) | Done |
 | MVP 1.7 (dates UX, View, collapsible sections, rule builder) | Done |
 | Baseline / ghost bars / functional history | MVP 2 (blocked on MVP 1.7) |
@@ -1261,7 +1259,7 @@ Features identified but **not** in MVP 1.6. Ordered by priority.
 
 | Priority | Feature | Description | Rationale |
 |----------|---------|-------------|-----------|
-| 1 | **Gantt zoom UX polish** | **Done** — 4-level zoom + Today control in feature panel header (`timelineZoom.js`) |
+| 1 | **Gantt zoom UX polish** | Global scale control / denser day layout; per-sprint scale already supported | Optional enhancement on top of per-sprint `scale` |
 | 2 | **Delivery commitment (star)** | Optional flag: "Product delivery date". Star icon at target date on the bar. Toggle in create modal and detail panel. | Core Excel convention; communicates executive delivery commitment. |
 | 3 | **Bar labels and hover** | Feature name truncated inside bar; hover shows start date, target date, and notes preview. | Visual polish; complements notes and dates already on features. |
 | 4 | **Filter: delivery commitments** | Toggle or filter to show only features with delivery star. | Useful once delivery commitment exists; depends on priority 2. |
@@ -1430,4 +1428,4 @@ Build on MVP 1.5 without adding a backend:
 | 2026-08-15 | Empty workspace seed: keep SAFe calendar from PI 26.2 onward; remove mock projects, teams, products, and features. Setup wizard last step imports a feature list. |
 | 2026-08-15 | Getting started overlay sits above the Today marker; product tour highlights **Import**; Iterations plans start collapsed |
 | 2026-08-15 | **Dynamic day timeline:** today-centered ±90-day window, infinite horizontal scroll (±30 days per edge), weekend shading; SAFe plan bands merged when assigned; **Calendar ready** checklist step auto-completes with project |
-| 2026-08-15 | **Timeline navigation:** Today button and 4-level zoom (Compact → X-Large) in the feature panel header; day-column tooltips for assigned features; zoom persisted per project |
+| 2026-08-15 | **Today button** in the feature panel header to recenter the Gantt on the current date |

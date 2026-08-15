@@ -4,57 +4,9 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
-  Minus,
-  Plus,
   Search,
   X,
 } from 'lucide-react'
-
-function ZoomControls({
-  compact = false,
-  zoomLabel,
-  canZoomIn,
-  canZoomOut,
-  onZoomIn,
-  onZoomOut,
-}) {
-  const btnClass = compact
-    ? 'flex h-6 w-6 items-center justify-center rounded text-gray-400 hover:bg-white/10 hover:text-white disabled:opacity-30'
-    : 'flex h-5 w-5 items-center justify-center rounded text-gray-400 hover:bg-white/10 hover:text-white disabled:opacity-30'
-
-  return (
-    <div
-      className={`flex items-center ${compact ? 'flex-col gap-0.5' : 'gap-0.5'}`}
-      title={`Zoom: ${zoomLabel}`}
-    >
-      <button
-        type="button"
-        onClick={onZoomOut}
-        disabled={!canZoomOut}
-        title="Zoom out"
-        className={btnClass}
-        aria-label="Zoom out"
-      >
-        <Minus size={compact ? 12 : 11} />
-      </button>
-      {!compact && (
-        <span className="min-w-[3.25rem] px-0.5 text-center text-[9px] font-medium text-gray-300">
-          {zoomLabel}
-        </span>
-      )}
-      <button
-        type="button"
-        onClick={onZoomIn}
-        disabled={!canZoomIn}
-        title="Zoom in"
-        className={btnClass}
-        aria-label="Zoom in"
-      >
-        <Plus size={compact ? 12 : 11} />
-      </button>
-    </div>
-  )
-}
 
 export default function FeaturePanelHeader({
   collapsed,
@@ -65,11 +17,6 @@ export default function FeaturePanelHeader({
   onSearchChange,
   searchInputRef,
   onScrollToToday,
-  zoomLabel = 'Normal',
-  canZoomIn = false,
-  canZoomOut = false,
-  onZoomIn,
-  onZoomOut,
 }) {
   return (
     <div className="flex h-full shrink-0 flex-col justify-end gap-1 self-stretch border-b border-r border-white/10 bg-header px-2 pb-1.5 pt-1.5">
@@ -104,14 +51,6 @@ export default function FeaturePanelHeader({
               >
                 Today
               </button>
-              <span className="h-3 w-px bg-white/15" aria-hidden />
-              <ZoomControls
-                zoomLabel={zoomLabel}
-                canZoomIn={canZoomIn}
-                canZoomOut={canZoomOut}
-                onZoomIn={onZoomIn}
-                onZoomOut={onZoomOut}
-              />
               <button
                 type="button"
                 onClick={onToggle}
@@ -168,14 +107,6 @@ export default function FeaturePanelHeader({
           >
             <CalendarDays size={13} />
           </button>
-          <ZoomControls
-            compact
-            zoomLabel={zoomLabel}
-            canZoomIn={canZoomIn}
-            canZoomOut={canZoomOut}
-            onZoomIn={onZoomIn}
-            onZoomOut={onZoomOut}
-          />
         </div>
       )}
     </div>

@@ -19,10 +19,20 @@ function featureRows(features) {
 
 function sectionWithFeatures(section, features, collapsedSections) {
   const collapsed = isSectionCollapsed(collapsedSections, section.id)
-  return [
-    sectionRow(section, collapsedSections),
-    ...(collapsed ? [] : featureRows(features)),
-  ]
+  const rows = [sectionRow(section, collapsedSections)]
+  if (!collapsed) {
+    rows.push(...featureRows(features))
+    if (section.id?.startsWith('team-') && features.length === 0) {
+      rows.push({
+        type: 'team-drop',
+        id: `${section.id}-drop`,
+        sectionId: section.id,
+        teamId: section.id.slice('team-'.length),
+        label: section.label,
+      })
+    }
+  }
+  return rows
 }
 
 function needsReassignmentSection(items) {
@@ -55,7 +65,6 @@ function buildTeamGroupedRows({
 
   for (const teamId of assignedTeamIds) {
     const teamFeatures = assignedPlanned.filter((f) => f.teamId === teamId)
-    if (!teamFeatures.length) continue
     rows.push(
       ...sectionWithFeatures(
         {
@@ -125,20 +134,17 @@ export function buildTimelineRows(
 
   if (filterTeamId && viewMode !== 'backlog') {
     const matched = assignedPlanned.filter((f) => f.teamId === filterTeamId)
-    const rows = []
-    if (matched.length) {
-      rows.push(
-        ...sectionWithFeatures(
-          {
-            id: `team-${filterTeamId}`,
-            label: teamMap[filterTeamId]?.name ?? 'Team',
-            count: matched.length,
-          },
-          matched,
-          collapsedSections,
-        ),
-      )
-    }
+    const rows = [
+      ...sectionWithFeatures(
+        {
+          id: `team-${filterTeamId}`,
+          label: teamMap[filterTeamId]?.name ?? 'Team',
+          count: matched.length,
+        },
+        matched,
+        collapsedSections,
+      ),
+    ]
     if (backlog.length) {
       rows.push(...sectionWithFeatures(backlogSection, backlog, collapsedSections))
     }

@@ -29,7 +29,7 @@ function barFixedStyle(rects, startWeek, endWeek, visualRowIndex, timelineRows, 
   const rowTop = visualRowTop(timelineRows, visualRowIndex)
   const barLeft = weeks[startWeek]?.left ?? startWeek * WEEK_WIDTH
   const barWidth = Math.max(4, unitsWidth(weeks, startWeek, endWeek) - BAR_PADDING * 2)
-  const left = rects.gridRect.left + leftColWidth + barLeft + BAR_PADDING - rects.scrollLeft
+  const left = rects.gridRect.left + barLeft + BAR_PADDING - rects.scrollLeft
   const top =
     rects.gridRect.top +
     rects.rowsOffsetTop +
@@ -44,6 +44,45 @@ function barFixedStyle(rects, startWeek, endWeek, visualRowIndex, timelineRows, 
     width: barWidth,
     height: BAR_HEIGHT,
     zIndex: 9999,
+  }
+}
+
+function rowGhostLayout(rects, visualRowIndex, timelineRows, leftColWidth) {
+  const row = timelineRows[visualRowIndex] ?? { type: 'feature' }
+  const rowH = rowHeightFor(row)
+  const rowTop = visualRowTop(timelineRows, visualRowIndex)
+  const top = rects.gridRect.top + rects.rowsOffsetTop + rowTop - rects.scrollTop
+  const panelLeft = rects.gridRect.left - leftColWidth
+
+  return {
+    panel: {
+      position: 'fixed',
+      left: panelLeft,
+      top,
+      width: leftColWidth,
+      height: rowH,
+      zIndex: 9998,
+      pointerEvents: 'none',
+    },
+    timeline: {
+      position: 'fixed',
+      left: rects.gridRect.left,
+      top,
+      width: rects.gridRect.width,
+      height: rowH,
+      zIndex: 9998,
+      pointerEvents: 'none',
+    },
+    indicator: {
+      position: 'fixed',
+      left: panelLeft,
+      top: top - 1,
+      width: leftColWidth + rects.gridRect.width,
+      height: 2,
+      zIndex: 9999,
+      pointerEvents: 'none',
+    },
+    scrollLeft: rects.scrollLeft,
   }
 }
 
@@ -189,6 +228,7 @@ export function useFeatureDrag(timelineRows, onMove, leftColWidth = LEFT_COL_WID
       const snap = computeSnap(clientX, clientY, base.feature, base.mode, base)
       const duration = snap.endWeek - snap.startWeek + 1
       const rects = getRects()
+      const isRowDrag = base.mode === 'row'
       return {
         ...base,
         clientX,
@@ -197,17 +237,22 @@ export function useFeatureDrag(timelineRows, onMove, leftColWidth = LEFT_COL_WID
         snapEndWeek: snap.endWeek,
         snapVisualRowIndex: snap.visualRowIndex,
         snapDuration: duration,
-        barStyle: rects
-          ? barFixedStyle(
-              rects,
-              snap.startWeek,
-              snap.endWeek,
-              snap.visualRowIndex,
-              timelineRows,
-              leftColWidth,
-              weekCalendar,
-            )
-          : null,
+        barStyle:
+          rects && !isRowDrag
+            ? barFixedStyle(
+                rects,
+                snap.startWeek,
+                snap.endWeek,
+                snap.visualRowIndex,
+                timelineRows,
+                leftColWidth,
+                weekCalendar,
+              )
+            : null,
+        rowGhostStyle:
+          rects && isRowDrag
+            ? rowGhostLayout(rects, snap.visualRowIndex, timelineRows, leftColWidth)
+            : null,
       }
     },
     [computeSnap, getRects, leftColWidth, timelineRows, weekCalendar],

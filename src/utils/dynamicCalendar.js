@@ -1,6 +1,6 @@
+import { DAY_WIDTH } from '../constants'
 import { addDays, formatDay, parseISO, toISODate } from './dates'
 import { monthKey, monthLabel } from './iterationPlans'
-import { DEFAULT_ZOOM_LEVEL, scaledDayWidth } from './timelineZoom'
 
 export const DYNAMIC_CALENDAR = {
   INITIAL_DAYS_BACK: 90,
@@ -43,7 +43,7 @@ function isWeekend(isoDate) {
   return day === 0 || day === 6
 }
 
-function buildGenericDayUnit(isoDate, index, left, dayWidth) {
+function buildGenericDayUnit(isoDate, index, left) {
   const weekend = isWeekend(isoDate)
   return {
     index,
@@ -52,7 +52,7 @@ function buildGenericDayUnit(isoDate, index, left, dayWidth) {
     startDate: isoDate,
     endDate: isoDate,
     scale: 'day',
-    width: dayWidth,
+    width: DAY_WIDTH,
     left,
     sprintBg: weekend ? 'bg-timeline-weekend' : 'bg-timeline-day',
     isWeekend: weekend,
@@ -121,13 +121,7 @@ export function findUnitIndexForDate(units, isoDate) {
  * Merge a SAFe plan calendar with generic day columns before/after the plan range.
  * Outside the plan (or when no plan exists), each column is one calendar day.
  */
-export function buildDynamicCalendar({
-  startDate,
-  endDate,
-  planCalendar,
-  zoomLevel = DEFAULT_ZOOM_LEVEL,
-}) {
-  const dayWidth = scaledDayWidth(zoomLevel)
+export function buildDynamicCalendar({ startDate, endDate, planCalendar }) {
   const planUnits = planCalendar?.weeks ?? []
   const planTimeboxes = planCalendar?.timeboxes ?? []
   const planSprints = planCalendar?.sprints ?? []
@@ -159,8 +153,8 @@ export function buildDynamicCalendar({
       continue
     }
 
-    units.push(buildGenericDayUnit(cursor, index, left, dayWidth))
-    left += dayWidth
+    units.push(buildGenericDayUnit(cursor, index, left))
+    left += DAY_WIDTH
     index += 1
     cursor = addDays(cursor, 1)
   }

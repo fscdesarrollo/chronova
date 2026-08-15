@@ -38,7 +38,7 @@ import {
 import { defaultFormattingRulesForProject } from '../utils/formattingRules'
 import { hasDependencyCycle, normalizeDependsOn, sameFeatureId } from '../utils/dependencies'
 import { getProjectGanttReadiness } from '../utils/ganttReadiness'
-import { loadActor, loadLayout, loadState, loadTimelineView, saveActor, saveLayout, saveState, saveTimelineView } from '../utils/storage'
+import { loadActor, loadLayout, loadState, saveActor, saveLayout, saveState } from '../utils/storage'
 import { featureBarPixels, isCrossPi } from '../utils/weekCalendar'
 import {
   buildCalendarFromPlan,
@@ -56,13 +56,6 @@ import {
   findUnitIndexForDate,
   DYNAMIC_CALENDAR,
 } from '../utils/dynamicCalendar'
-import {
-  canZoomIn,
-  canZoomOut,
-  clampZoomLevel,
-  DEFAULT_ZOOM_LEVEL,
-  zoomLevelLabel,
-} from '../utils/timelineZoom'
 
 let eventIdCounter = 1
 let commentIdCounter = 1
@@ -190,19 +183,7 @@ export function useTimelineState() {
   const [showGanttSettings, setShowGanttSettings] = useState(false)
   const [scrollToDate, setScrollToDate] = useState(null)
   const [timelineRangeByProject, setTimelineRangeByProject] = useState({})
-  const [timelineZoomByProject, setTimelineZoomByProject] = useState({})
   const [layout, setLayoutState] = useState(loadLayout)
-
-  useEffect(() => {
-    if (!projectId) return
-    const saved = loadTimelineView(projectId)
-    if (saved?.zoomLevel != null) {
-      setTimelineZoomByProject((prev) => ({
-        ...prev,
-        [projectId]: clampZoomLevel(saved.zoomLevel),
-      }))
-    }
-  }, [projectId])
 
   useEffect(() => {
     resetIdCounters({ projects, teams, products, iterationPlans, timeboxes, sprints: planSprints })
@@ -244,26 +225,14 @@ export function useTimelineState() {
     [timeboxes, activePlanId],
   )
 
-  const timelineZoomLevel = timelineZoomByProject[projectId] ?? DEFAULT_ZOOM_LEVEL
-
-  const persistTimelineZoom = useCallback(
-    (level) => {
-      if (!projectId) return
-      const saved = loadTimelineView(projectId) ?? { scrollLeft: 0, scrollTop: 0 }
-      saveTimelineView(projectId, { ...saved, zoomLevel: level })
-    },
-    [projectId],
-  )
-
   const calendarsByProjectId = useMemo(() => {
     const map = new Map()
     for (const project of projects) {
-      const zoomLevel = timelineZoomByProject[project.id] ?? DEFAULT_ZOOM_LEVEL
       const planId = planIdForProject(projectIterationPlans, project.id)
       const tbs = planId ? timeboxes.filter((t) => t.planId === planId) : []
       const tbIds = new Set(tbs.map((t) => t.id))
       const sprs = planSprints.filter((s) => tbIds.has(s.timeboxId))
-      const planCal = tbs.length ? buildCalendarFromPlan(tbs, sprs, zoomLevel) : emptyCalendar()
+      const planCal = tbs.length ? buildCalendarFromPlan(tbs, sprs) : emptyCalendar()
 
       const baseRange = timelineRangeByProject[project.id] ?? defaultDynamicRange()
       const projectFeatures = featuresRaw.filter((f) => f.projectId === project.id)
@@ -275,20 +244,11 @@ export function useTimelineState() {
           startDate: range.startDate,
           endDate: range.endDate,
           planCalendar: planCal,
-          zoomLevel,
         }),
       )
     }
     return map
-  }, [
-    projects,
-    projectIterationPlans,
-    timeboxes,
-    planSprints,
-    timelineRangeByProject,
-    timelineZoomByProject,
-    featuresRaw,
-  ])
+  }, [projects, projectIterationPlans, timeboxes, planSprints, timelineRangeByProject, featuresRaw])
 
   const projectCalendar = useMemo(() => {
     const built =
@@ -297,7 +257,6 @@ export function useTimelineState() {
         startDate: defaultDynamicRange().startDate,
         endDate: defaultDynamicRange().endDate,
         planCalendar: emptyCalendar(),
-        zoomLevel: timelineZoomLevel,
       })
     const current = findCurrentTimebox(timeboxesForActivePlan)
     const todayIso = toISODate(new Date())
@@ -309,21 +268,7 @@ export function useTimelineState() {
         current?.startDate ?? todayIso,
       ),
     }
-  }, [calendarsByProjectId, projectId, timeboxesForActivePlan, timelineZoomLevel])
-
-  const zoomTimelineIn = useCallback(() => {
-    if (!projectId || !canZoomIn(timelineZoomLevel)) return
-    const next = timelineZoomLevel + 1
-    setTimelineZoomByProject((prev) => ({ ...prev, [projectId]: next }))
-    persistTimelineZoom(next)
-  }, [projectId, timelineZoomLevel, persistTimelineZoom])
-
-  const zoomTimelineOut = useCallback(() => {
-    if (!projectId || !canZoomOut(timelineZoomLevel)) return
-    const next = timelineZoomLevel - 1
-    setTimelineZoomByProject((prev) => ({ ...prev, [projectId]: next }))
-    persistTimelineZoom(next)
-  }, [projectId, timelineZoomLevel, persistTimelineZoom])
+  }, [calendarsByProjectId, projectId, timeboxesForActivePlan])
 
   const scrollToToday = useCallback(() => {
     setScrollToDate(toISODate(new Date()))
@@ -880,7 +825,7 @@ export function useTimelineState() {
             nextTeamId = null
             nextPlanningStatus = 'planned'
             nextAssignmentStatus = 'team_unassigned'
-          } else if (target.teamId && target.teamId !== current.teamId) {
+          } else if (target.teamId && (target.teamId !== current.teamId || current.planningStatus === 'backlog')) {
             if (!current.teamId) {
               addAuditEvent(
                 createEvent('feature.team_assigned', actor, id, {
@@ -1861,12 +1806,6 @@ export function useTimelineState() {
     currentPiId: currentTimebox?.id ?? null,
     getDefaultFeatureDates,
     extendTimelineRange,
-    timelineZoomLevel,
-    timelineZoomLabel: zoomLevelLabel(timelineZoomLevel),
-    canZoomTimelineIn: canZoomIn(timelineZoomLevel),
-    canZoomTimelineOut: canZoomOut(timelineZoomLevel),
-    zoomTimelineIn,
-    zoomTimelineOut,
     scrollToToday,
     ganttReadiness,
   }

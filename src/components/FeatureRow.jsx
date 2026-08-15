@@ -5,6 +5,76 @@ import { formatDay } from '../utils/dates'
 import { textColorForBg } from '../utils/colors'
 import { evaluateFormattingRules, ROW_ICON_LABELS, ruleTooltip } from '../utils/formattingRules'
 
+export function FeatureDragRowGhost({ feature, rowGhostStyle, collapsed = false }) {
+  if (!feature || !rowGhostStyle) return null
+
+  const { panel, timeline, indicator, scrollLeft = 0 } = rowGhostStyle
+  const barW = feature.onGantt
+    ? Math.max(4, (feature.barWidth || feature.duration * WEEK_WIDTH) - BAR_PADDING * 2)
+    : 0
+  const timelineBarLeft = feature.onGantt
+    ? (feature.barLeft ?? feature.startWeek * WEEK_WIDTH) + BAR_PADDING - scrollLeft
+    : 0
+
+  return (
+    <>
+      <div
+        style={indicator}
+        className="rounded-full bg-violet-500 shadow-[0_0_0_2px_rgba(139,92,246,0.25)]"
+        aria-hidden
+      />
+      <div
+        style={panel}
+        className="flex items-center gap-2 border border-violet-300 bg-white/95 px-2 shadow-lg ring-2 ring-violet-400/40 backdrop-blur-sm"
+      >
+        {!collapsed && (
+          <>
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full border border-gray-200"
+              style={{ backgroundColor: feature.productColor }}
+            />
+            <div className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">
+              {feature.name}
+            </div>
+          </>
+        )}
+        {collapsed && (
+          <span
+            className="mx-auto h-2.5 w-2.5 shrink-0 rounded-full border border-gray-200"
+            style={{ backgroundColor: feature.productColor }}
+          />
+        )}
+      </div>
+      <div
+        style={timeline}
+        className="border border-violet-200/80 bg-violet-50/30 shadow-lg ring-1 ring-violet-300/30 backdrop-blur-[1px]"
+      >
+        {feature.onGantt ? (
+          <div
+            className="absolute top-1/2 h-7 -translate-y-1/2 rounded px-2 shadow-md"
+            style={{
+              left: timelineBarLeft,
+              width: barW,
+              backgroundColor: feature.color,
+            }}
+          >
+            <span
+              className="block truncate text-xs font-medium leading-7"
+              style={{ color: textColorForBg(feature.color) }}
+            >
+              {feature.name}
+            </span>
+          </div>
+        ) : (
+          <div className="flex h-full items-center px-3 text-xs font-medium text-violet-600/80">
+            Assigning to team…
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
 const ROW_ICONS = {
   clock: Clock,
   'alert-triangle': AlertTriangle,
@@ -86,6 +156,17 @@ function hasStatusIcons(feature, fmt, needsAlert) {
   )
 }
 
+export function TeamDropRow({ timelineWidth = 0 }) {
+  return (
+    <div
+      className="flex items-center border-b border-r border-dashed border-gray-200 bg-gray-50/40 px-3 text-xs italic text-gray-400"
+      style={{ height: ROW_HEIGHT, width: timelineWidth || '100%' }}
+    >
+      Drop backlog features here
+    </div>
+  )
+}
+
 export function FeatureLabelRow({
   feature,
   collapsed = false,
@@ -119,7 +200,7 @@ export function FeatureLabelRow({
       onKeyDown={handleRowKeyDown}
       title={collapsed ? feature.name : undefined}
       className={`group relative flex w-full shrink-0 cursor-pointer items-center gap-2 border-b border-r border-gray-200 text-left ${
-        isDragging ? 'bg-white' : isSelected ? 'bg-violet-50' : 'bg-white hover:bg-gray-50/80'
+        isDragging ? 'opacity-30' : isSelected ? 'bg-violet-50' : 'bg-white hover:bg-gray-50/80'
       } ${isDimmed ? 'opacity-25' : ''} ${collapsed ? 'justify-center px-1' : 'px-2'}`}
       style={{
         height: ROW_HEIGHT,
@@ -219,6 +300,7 @@ export function FeatureBarRow({
   totalWidth = 0,
   units = [],
   onBarPointerDown,
+  onRowPointerDown,
   onSelect,
 }) {
   const timelineWidth = totalWidth || units.reduce((s, u) => s + (u.width ?? WEEK_WIDTH), 0)
@@ -226,10 +308,11 @@ export function FeatureBarRow({
   if (!feature.onGantt) {
     return (
       <div
-        className={`relative shrink-0 border-b border-gray-100 bg-gray-50/30 ${
+        className={`relative shrink-0 touch-none border-b border-gray-100 bg-gray-50/30 active:cursor-grabbing ${
           isSelected ? 'bg-violet-50/30' : ''
-        } ${isDimmed ? 'opacity-25' : ''}`}
+        } ${isDragging ? 'opacity-30' : 'hover:bg-gray-50/60'} ${isDimmed ? 'opacity-25' : ''}`}
         style={{ height: ROW_HEIGHT, width: timelineWidth }}
+        onPointerDown={onRowPointerDown}
       />
     )
   }
@@ -286,7 +369,9 @@ export function FeatureBarRow({
         ).map((unit) => (
           <div
             key={unit.index}
-            className={`h-full border-r border-dotted border-gray-200 ${unit.sprintBg ?? ''}`}
+            className={`h-full border-r border-dotted border-gray-200 ${
+              unit.isGeneric && unit.isWeekend ? 'bg-timeline-weekend' : ''
+            }`}
             style={{ width: unit.width ?? WEEK_WIDTH }}
           />
         ))}
