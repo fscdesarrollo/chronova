@@ -48,7 +48,6 @@ export default function TimelineGrid({
   emptyMessage = 'No features yet. Use "Add Feature" to get started.',
   onExtendRange,
   searchQuery = '',
-  onSearchChange,
 }) {
   const weekCalendar = calendar?.weeks ?? []
   const totalWeeks = calendar?.totalWeeks ?? 0

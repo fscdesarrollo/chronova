@@ -14,41 +14,30 @@ import {
 function FilterChip({ label, value, active, onClear, children, open, onToggle }) {
   return (
     <div className="relative">
-      <button
-        type="button"
-        onClick={onToggle}
+      <div
         className={`flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium transition-colors ${
           active
             ? 'border-violet-300 bg-violet-50 text-violet-800'
             : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
         }`}
       >
-        <span className="text-gray-500">{label}:</span>
-        <span className="max-w-[7rem] truncate">{value}</span>
-        <ChevronDown size={12} className="shrink-0 opacity-60" />
+        <button type="button" onClick={onToggle} className="flex min-w-0 items-center gap-1">
+          <span className="text-gray-500">{label}:</span>
+          <span className="max-w-[7rem] truncate">{value}</span>
+          <ChevronDown size={12} className="shrink-0 opacity-60" />
+        </button>
         {active && (
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(e) => {
-              e.stopPropagation()
-              onClear()
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                e.stopPropagation()
-                onClear()
-              }
-            }}
-            className="ml-0.5 flex h-4 w-4 items-center justify-center rounded hover:bg-violet-200/60"
+          <button
+            type="button"
+            onClick={onClear}
+            className="ml-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded hover:bg-violet-200/60"
             title={`Clear ${label.toLowerCase()} filter`}
             aria-label={`Clear ${label.toLowerCase()} filter`}
           >
             <X size={10} />
-          </span>
+          </button>
         )}
-      </button>
+      </div>
       {open && children}
     </div>
   )
@@ -97,19 +86,19 @@ function FilterMenu({ options, value, onChange, onClose }) {
 }
 
 export default function TimelineToolbar({
-  projects,
+  projects = [],
   projectId,
   onProjectChange,
   planLabel,
   viewMode,
   onViewScopeChange,
-  teamsForProject,
+  teamsForProject = [],
   filterTeamId,
   onTeamFilterChange,
-  productsForProject,
+  productsForProject = [],
   filterProductId,
   onProductFocusChange,
-  searchQuery,
+  searchQuery = '',
   onSearchChange,
   onCollapseAll,
   onExpandAll,
@@ -160,7 +149,7 @@ export default function TimelineToolbar({
       className="shrink-0 border-b border-gray-200 bg-white"
     >
       {/* Row 1 — context + actions */}
-      <div className="flex h-11 items-center justify-between gap-4 border-b border-gray-100 px-4">
+      <div className="flex min-h-11 items-center justify-between gap-4 border-b border-gray-100 px-4 py-1.5">
         <div className="flex min-w-0 items-center gap-3">
           <div className="min-w-0">
             <label className="sr-only" htmlFor="timeline-active-project">

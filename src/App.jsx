@@ -273,7 +273,7 @@ export default function App() {
       case 'timeline':
       default:
         return (
-          <>
+          <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
             <div
               data-tour="timeline-main"
               className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
@@ -319,7 +319,6 @@ export default function App() {
                 }}
                 onToggleSectionCollapsed={timeline.toggleSectionCollapsed}
                 searchQuery={featureSearchQuery}
-                onSearchChange={setFeatureSearchQuery}
                 onMove={timeline.moveFeature}
                 selectedFeatureId={timeline.selectedFeatureId}
                 onSelectFeature={requestSelectFeature}
@@ -355,7 +354,7 @@ export default function App() {
                 onEditPreviewChange={timeline.setFeatureEditPreview}
               />
             )}
-          </>
+          </div>
         )
     }
   }
@@ -437,7 +436,7 @@ export default function App() {
           />
         )}
 
-        <div className="flex min-h-0 flex-1 overflow-hidden">{renderMainContent()}</div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{renderMainContent()}</div>
       </div>
 
       <AddFeatureModal
