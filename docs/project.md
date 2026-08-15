@@ -108,9 +108,9 @@ Sprint 1 ── Sprint 2 ── Sprint 3 ── IP (3 wks innovation) ── Pla
 
 | Scenario | Behavior |
 |----------|----------|
-| PIs configured | Timeline header shows PI → Sprint → Week along the horizontal Gantt scroll |
-| No PI/Sprint configured | Dynamic week grid — scrolling horizontally forward or backward reveals additional weeks |
-| Horizontal navigation | Continuous scroll across the timeline; not limited to a fixed number of PIs |
+| PIs configured | Timeline header shows PI → Sprint → Week in the plan range; generic day columns before and after |
+| No PI/Sprint configured | Dynamic **day** grid — today centered (±90 days initially); scroll loads ±30 days per edge; weekends shaded |
+| Horizontal navigation | Continuous infinite scroll; not limited to a fixed number of PIs |
 
 #### Organization: project, team, and product
 
@@ -157,7 +157,7 @@ Reusable **iteration plans** define the timeline calendar. Methodology-neutral n
 
 **Current timebox:** automatic — the timebox that contains **today**; if none, the first future timebox. Used for Add Feature default dates.
 
-**Pages:** sidebar **Iterations** (CRUD plans / iterations / sprints; read-only list of projects using the plan). **Projects** assigns the plan. Timeline top bar shows `Plan: {name}` only on the Timeline page.
+**Pages:** sidebar **Iterations** (CRUD plans / iterations / sprints; read-only list of projects using the plan). Plans start **collapsed** when the page opens; expand a plan to edit its iterations. A newly created plan expands automatically. **Projects** assigns the plan. Timeline top bar shows `Plan: {name}` only on the Timeline page.
 
 **UI chrome:** management pages use a single title in the top bar (no duplicate in-page H1). Current/Baseline toggle is removed; the app always shows the current plan view.
 
@@ -329,6 +329,34 @@ Features are created via a **simple modal** opened from the **"Add Feature"** bu
 6. Audit event `feature.created` is recorded (actor + timestamp).
 7. Planned features with valid dates can be repositioned or resized via drag-and-drop.
 
+#### Import features wizard
+
+Users migrating from Excel can import a **list of features into the active project** instead of creating them one by one. The flow is a 5-step wizard opened from **Import** in the Timeline top bar (also offered on the Gantt checklist). Nothing is written until the user confirms on the last step.
+
+| Step | Purpose |
+|------|---------|
+| 1. This project | Confirms destination project; download the [example CSV](./feature-import-example.csv) |
+| 2. Your list | Upload a `.csv` file, or paste rows copied from Excel / Google Sheets |
+| 3. Columns | Map spreadsheet columns to Feature name, Product, Team, dates, Notes; pick date format |
+| 4. Match | Resolve each product name (use / assign to this project / create / skip) and each team (use / assign / backlog) |
+| 5. Review | Preview counts and row-level status; optional **Import everything as backlog**; confirm |
+
+**File format (v1):** CSV (comma, semicolon, or tab). Excel `.xlsx` is **not** parsed — the wizard tells the user to **Save As → CSV UTF-8**.
+
+**Example file:** [docs/feature-import-example.csv](./feature-import-example.csv) — ready to open in Excel, Google Sheets, or Numbers, then upload in the wizard. It uses English headers (`Feature name`, `Product`, `Team`, `Start date`, `Target date`, `Notes`) and includes planned rows, backlog rows, and a quoted notes cell. Use the same team name as in setup (the sample uses `Platform Team`) so those rows are planned. Product names in the file are created and assigned to the project on confirm. The same file is what **Download example CSV** saves. Header aliases such as `Nombre` / `Producto` / `Equipo` are auto-detected.
+
+**Required columns:** feature name and product. Team, start date, target date, and notes are optional.
+
+**Product matching:** case-insensitive name match against the global catalog. If the product exists but is not on this project, it is **assigned** (`project_products`). If it does not exist, it is **created** and assigned here. The user can remap to another product or skip those rows.
+
+**Team matching:** case-insensitive name match. Unknown teams import as **backlog**. Matching teams that are not on the project can be assigned. Missing team or dates → backlog (no Gantt bar). Invalid dates or `target < start` → warning; dates omitted.
+
+**Limits and defaults:** first 500 data rows; duplicate names in the project are imported again; invalid rows are skipped (the rest still import); notes truncated to 500 characters. User stories, comments, and dependencies are **not** imported.
+
+**Apply order on confirm:** create products → assign products to the project → assign teams to the project → create features. Audit: `product.created`, `product.assigned`, `team.assigned`, `feature.created` (payload `imported: true`), plus a summary `features.imported`.
+
+**Gating:** requires an active project. Does **not** require products or teams to exist first — the wizard can create and assign them. Add Feature remains blocked until the project has a product; Import is the migration path for an empty project.
+
 **Assigning team from backlog:** team can be selected freely while editing. On **Save**, if a team is assigned, start and target dates are required; validation errors are shown in the panel.
 
 **Detail panel editing:** name, team, dates, delivered flag, notes, and dependencies are edited in a **draft** state. **Start and target dates preview live** on the Gantt bar while editing (before Save). Click **Save changes** to persist. Comments and user stories save immediately. If the user closes the panel, selects another feature, or clicks outside with unsaved changes, a dialog offers **Save**, **Discard**, or **Cancel** (keep editing).
@@ -499,11 +527,11 @@ Chronova is **Gantt-centric**: configuration pages are prerequisites; the goal i
 |------|----------|
 | **First open** | No `chronova-navigation` → land on **Home** |
 | **Return visit** | `chronova-navigation.lastPage` → restore last page (e.g. Timeline) |
-| **Product tour** (`app-intro`) | Spotlight walkthrough with **real page navigation**; relaunchable from Home (**Take a tour**). Registry: `src/tours/registry.js`; runner: `TourRunner`. Elements use `data-tour` attributes. Final step: offer setup or **Skip setup for now**. |
+| **Product tour** (`app-intro`) | Spotlight walkthrough with **real page navigation**; relaunchable from Home (**Take a tour**). Registry: `src/tours/registry.js`; runner: `TourRunner`. Elements use `data-tour` attributes. Includes a Timeline step on **Import**. Final step: offer setup or **Skip setup for now**. |
 | **Tour CTA highlight** | On first Home visit (no navigation history, tour not completed), **Take a tour** shows an animated futuristic highlight (“Start here”). |
-| **Setup wizard** | On demand only (Home, tour end, checklist). Steps: User name → Project + calendar start → Team → First feature. Calls `setupProjectForGantt` (auto-creates plan/timebox/product if needed). Does **not** open automatically on app load. |
-| **Gantt checklist** | On Timeline when project is not Gantt-ready: project → calendar → product → team → first feature on Gantt. Dismissible. |
-| **Gantt-ready** | Computed by `ganttReadiness` (`src/utils/ganttReadiness.js`): plan with timebox, product assigned, team assigned; first bar optional for “complete” checklist. |
+| **Setup wizard** | Opens on first visit when no project exists (also Home, tour end, checklist). Steps: User name → Project → Team → **Import features** (optional). Creates the project and team, assigns the seeded SAFe calendar (PI 26.2 onward), then opens the import wizard unless the user skips. Does **not** create a dummy first feature. |
+| **Gantt checklist** | On Timeline when project is not Gantt-ready: project → calendar → product → team → first feature on Gantt. **Calendar ready** completes with the project (generic day timeline is always available). Dismissible. Offers **Import a feature list** once a project exists. |
+| **Gantt-ready** | Computed by `ganttReadiness` (`src/utils/ganttReadiness.js`): project, product assigned, team assigned; first bar optional for “complete” checklist. SAFe iteration plan is optional (adds PI/sprint bands when assigned). |
 
 Per-page tours (e.g. Timeline-only) are planned via the same tour registry pattern (v2).
 
@@ -565,11 +593,12 @@ Product focus dimming still applies on visible rows after search filtering.
 | Screen / area | Content |
 |---------------|---------|
 | Sidebar | Grouped nav: **Home** · Timeline · Projects, Iterations, Teams, Products; **User** name; active project + **View** / **Team** / **Product** controls (Timeline only) |
-| Top bar | Page title; on Timeline only: `Plan: {name}`; when product focus is active: **Vista: {product}** with color dot; **Gantt settings** + **Add Feature** (Timeline only). Dark variant on Home. |
+| Top bar | Page title; on Timeline only: `Plan: {name}`; when product focus is active: **Vista: {product}** with color dot; **Gantt settings** + **Import** + **Add Feature** (Timeline only). Dark variant on Home. |
 | Home | `TimeHorizon` background, `BrandWordmark`, pillars, CTAs: **Take a tour**, continue to last page, setup wizard, advanced configuration |
 | Onboarding | See [Onboarding and first-run UX](#onboarding-and-first-run-ux) above |
 | Gantt settings | Gear icon in top bar; modal with **Markers** and **Rules** (editable condition/action builder) tabs |
 | Add Feature modal | Backlog or planned; blocked until project has a product; planned path needs team + calendar for Gantt bar |
+| Import features wizard | CSV / paste into the active project; preview of products, teams, and rows before confirm |
 | Feature panel | Compact layout: team + dates + Delivered (locks dates when checked), notes, dependencies, user stories; **Comments** and **History** collapsible at bottom |
 | Timeline header | PIs → sprints → weeks; **TODAY** pill; **plan markers** (grouped when same date) |
 | Today marker | Auto-calculated vertical line at current day; **TODAY** label in fixed shared header row; horizontal scroll synced with Gantt body |
@@ -583,6 +612,7 @@ Product focus dimming still applies on visible rows after search filtering.
 | Interaction | Behavior |
 |-------------|----------|
 | Add Feature | Opens create modal; backlog (no team) or planned (team + dates) |
+| Import features | Opens 5-step wizard; CSV or paste; confirm preview before writing |
 | Assign team to backlog | Select team in detail panel; dates validated on **Save** |
 | Collapse section | Hide section rows in feature panel and Gantt; persisted per project |
 | Collapse all / Expand all | Toggle all section headers at once |
@@ -615,7 +645,7 @@ Product focus dimming still applies on visible rows after search filtering.
 - Developer assignment
 - Team burndown charts
 - Real-time integration with Jira / Azure DevOps
-- Excel import
+- Excel `.xlsx` workbook parse (CSV and spreadsheet paste are in scope)
 - Export to PDF / image / PowerPoint
 - Bank-holiday modeling in the grid (only a count indicator is desirable)
 - Hosting and deployment (not a priority until product is validated)
@@ -676,7 +706,8 @@ Each relevant change appends an event (never overwrites previous state):
 
 | Event | Trigger | Data captured |
 |-------|---------|---------------|
-| `feature.created` | Feature added | dates, product, team, project, planning status |
+| `feature.created` | Feature added (modal or import) | dates, product, team, project, planning status; import sets `imported: true` |
+| `features.imported` | Import wizard confirmed | project id, feature/product/team counts |
 | `feature.team_assigned` | Backlog feature assigned to a team | previous status, team |
 | `feature.renamed` | Feature name edited in detail panel | previous name, new name |
 | `feature.team_changed` | Feature team changed in detail panel | previous team, new team |
@@ -689,6 +720,7 @@ Each relevant change appends an event (never overwrites previous state):
 | `team.created` / `team.renamed` / `team.deleted` | Team CRUD | team id, name |
 | `team.assigned` / `team.unassigned` | Team assigned/unassigned from project | project id, team id |
 | `product.created` / `product.renamed` / `product.color_changed` | Product CRUD | product id, name, color |
+| `product.assigned` | Product assigned to a project (including import) | project id, product id |
 | `product.project_unassigned` | Project deleted; product orphaned | product id |
 | `baseline.frozen` | Baseline freeze action (MVP 2) | snapshot of all feature dates |
 | `feature.moved` | Bar dragged to new weeks | previous dates, new dates, **reason** |
@@ -716,7 +748,7 @@ Every event includes: `timestamp`, `actor` (simple name string), and `reason` (f
 |-------------|----------|-------|
 | Azure DevOps | Future, desirable | Import features into the Gantt — not v1 priority |
 | Jira | Not planned | — |
-| Excel import | Not planned | Goal is to stop using Excel |
+| Excel / CSV | CSV + paste in-app (v1); `.xlsx` not parsed | Migration off spreadsheets; template download in the import wizard |
 
 ---
 
@@ -766,15 +798,15 @@ This keeps data shapes aligned with the [future data model](#data-model-future-m
 
 ```
 src/
-  components/     React UI (Sidebar, TopNav, TimelineGrid, GanttSettingsModal, pages, BrandWordmark, …)
+  components/     React UI (Sidebar, TopNav, TimelineGrid, GanttSettingsModal, ImportFeaturesWizard, pages, BrandWordmark, …)
   components/onboarding/  SetupWizard, TourRunner, GanttSetupChecklist, TourCtaHighlight
   components/pages/       Home, Projects, Iterations, Teams, Products
   tours/          Tour registry (`app-intro`; extensible per page)
   hooks/          useTimelineState, useFeatureDrag, useLeftColResize
-  utils/          dates, storage, navigation, onboarding, ganttReadiness, weekCalendar, migration, …
-  data.js         Static seed data
+  utils/          dates, storage, navigation, onboarding, ganttReadiness, weekCalendar, dynamicCalendar, migration, featureImport, …
+  data.js         Calendar seed (PI 26.2 onward); empty projects/teams/products/features
   constants.js    Layout dimensions and drag helpers
-docs/             Project documentation (project.md, brand.md)
+docs/             Project documentation (project.md, brand.md, feature-import-example.csv)
 ```
 
 ### Client-side data shape (MVP 1.5 / 1.6 / 1.7)
@@ -1049,6 +1081,7 @@ Unique constraint: `(feature_id, depends_on_id)`.
 | `POST/DELETE /api/projects/:id/teams` | Assign/unassign teams to a project |
 | `GET /api/projects/:id/timeline` | Full timeline data (PIs, sprints, features, baselines) |
 | `GET/POST/PATCH/DELETE /api/features` | CRUD features |
+| `POST /api/projects/:id/features/import` | Bulk import features (CSV mapping result) |
 | `PATCH /api/features/:id/move` | Move feature (requires reason if baseline exists) |
 | `POST /api/features/:id/baseline` | Freeze baseline for a single feature |
 | `POST /api/pi/:id/baseline` | Freeze baseline for all features in a PI |
@@ -1076,7 +1109,7 @@ These were not explicitly discussed but are assumed unless changed:
 | Sidebar | Collapsible; state persisted |
 | Move reason | **TBD (MVP 2)** — required or optional |
 | Date granularity on Gantt | Per-sprint leaf scale (`day` \| `week` \| `month`); feature dates remain ISO source of truth |
-| PI display | Continuous horizontal scroll; dynamic weeks when no PI configured |
+| PI display | Continuous horizontal scroll; dynamic day grid when no PI configured; SAFe bands merged when plan assigned |
 | Re-freeze individual baseline | **TBD (MVP 2)** |
 | Recent history in panel | Last 20 events per feature |
 | Mobile layout | Desktop-first (executive presentations); responsive is desirable but not primary |
@@ -1096,8 +1129,9 @@ What the codebase already validates:
 | Gantt bars with color and completion | Done |
 | Drag & drop (bars and rows) | Done — includes team change on section drop; blocked when feature is Delivered |
 | Footer summary | Done |
-| Seed data (3 PIs: 26.2–26.4) | Done |
+| Seed calendar (PI 26.2–26.4; empty workspace) | Done |
 | Add Feature modal | Done |
+| Import features wizard (CSV / paste) | Done |
 | Feature detail panel | Done — compact layout; Delivered locks dates; Comments/History at end |
 | Client-side persistence (`localStorage`) | Done |
 | User display name (sidebar) | Done — no blocking modal on app load |
@@ -1116,7 +1150,7 @@ What the codebase already validates:
 | Timeline scroll position memory | Done — per project, on timeline exit |
 | Plan markers (Gantt settings) | Done |
 | Drag → team reassignment | Done |
-| Dynamic week calendar | Phase A done (from iteration plan); infinite empty scroll deferred |
+| Dynamic day calendar | Done — `src/utils/dynamicCalendar.js`; today-centered ±90d window; infinite scroll ±30d chunks; weekend shading; merges SAFe plan bands when assigned |
 | MVP 1.6 (backlog, comments, rules, dependencies) | Done |
 | MVP 1.7 (dates UX, View, collapsible sections, rule builder) | Done |
 | Baseline / ghost bars / functional history | MVP 2 (blocked on MVP 1.7) |
@@ -1163,7 +1197,7 @@ Application structure, navigation, and organizational model. Builds on MVP 1.
 | 13 | **Resizable feature panel** | Left Gantt column draggable; width persisted in `localStorage` |
 | 14 | **Full feature name visibility** | Names expand as panel widens; no truncate-only when space allows |
 | 15 | **Edit feature name** | Editable in detail panel; immediate update in list and bar |
-| 16 | **Dynamic week calendar** | **Phase A done** — calendar from assigned iteration plan; infinite empty scroll still deferred |
+| 16 | **Dynamic day calendar** | **Done** — generic day grid always available; infinite scroll; SAFe plan bands merged when a project has an iteration plan |
 | 17 | **Today marker** | **TODAY** pill in shared header row + vertical line at current day; not editable |
 | 18 | **Timeline scroll memory** | Per-project scroll saved on leaving Timeline (not F5); Today-centered default |
 | 19 | **Plan markers** | Gantt Settings modal; per-project markers (date, label, color); scroll on create |
@@ -1171,7 +1205,7 @@ Application structure, navigation, and organizational model. Builds on MVP 1.
 | 21 | **Detail panel dismiss** | Click outside timeline feature area closes detail panel |
 | 22 | **Split-pane Gantt layout** | Shared header row (Features + timeline); bodies scroll in sync; horizontal header scroll synced with Gantt; resize at any scroll position |
 
-> **MVP 1.5 scope is complete** except dynamic calendar (item 16), which may ship alongside MVP 1.6.
+> **MVP 1.5 scope is complete** (including dynamic day calendar, item 16).
 
 ### MVP 1.6 — Planning enhancements (complete)
 
@@ -1232,6 +1266,8 @@ Features identified but **not** in MVP 1.6. Ordered by priority.
 | 6 | **Dependency SVG connectors** | Curved lines between related bars on feature select | Deferred from MVP 1.6; highlight + list is sufficient for v1 |
 | 7 | **Gantt settings expansion** | Additional tabs (filters, export prefs, etc.) | Extensible shell already in place |
 | 8 | **Formatting rule preview** | "Matches N features" preview in rule builder | Deferred from MVP 1.7 |
+| 9 | **Excel `.xlsx` import** | Parse workbooks directly in the import wizard | CSV + paste cover the migration path; Save As CSV is the workaround |
+| 10 | **Import user stories / dependencies** | Extra columns or a second sheet | Deferred — v1 import is name + product (+ optional team/dates/notes) |
 
 **Explicitly not planned:**
 
@@ -1278,9 +1314,9 @@ Build on MVP 1.5 without adding a backend:
 | 9 | Export for meetings | Resolved (not in v1) |
 | 10 | Tool integrations | Resolved (ADO in MVP 4, not priority) |
 | 11 | Cross-PI features | Resolved |
-| 12 | How to create features? | Resolved (modal: team optional for backlog, product required, dates optional in backlog) |
+| 12 | How to create features? | Resolved (modal: team optional for backlog, product required, dates optional in backlog; **CSV import wizard** for bulk migrate into the active project) |
 | 13 | Feature positioning model | Resolved (dates → weeks; day display-only) |
-| 14 | PI display on Gantt | Resolved (continuous scroll; dynamic weeks when unconfigured) |
+| 14 | PI display on Gantt | Resolved (continuous infinite day scroll; SAFe bands when plan assigned) |
 | 15 | Backlog vs team_unassigned | Resolved (backlog = no team, no bar; team_unassigned = broken assignment, bar preserved) |
 | 16 | Story points visibility | Resolved (row badge + bar suffix when space; planned features only in footer) |
 | 17 | Comments vs notes | Resolved (separate fields; flat comment thread; notes = single annotation) |
@@ -1334,8 +1370,9 @@ Build on MVP 1.5 without adding a backend:
 | **SP** | Story Points — effort estimation unit |
 | **User** | Display name of the person making changes (UI); stored as `chronova-actor`; audit field `actor` |
 | **Product tour** | Guided spotlight walkthrough (`app-intro`); extensible via `src/tours/registry.js` |
-| **Setup wizard** | Multi-step flow to create project, calendar, team, and first Gantt feature |
-| **Gantt-ready** | Project has plan/timebox, product, and team — can add planned features to the Timeline |
+| **Setup wizard** | Multi-step flow: name, project, team, then optional CSV import |
+| **Import wizard** | Multi-step CSV / paste flow to add a feature list to the active project, with product/team match and preview before confirm |
+| **Gantt-ready** | Project has product and team — can add planned features to the Timeline; iteration plan optional |
 
 ---
 
@@ -1343,6 +1380,7 @@ Build on MVP 1.5 without adding a backend:
 
 | Document | Purpose |
 |----------|---------|
+| [feature-import-example.csv](./feature-import-example.csv) | Sample CSV for the import wizard (open in Excel, then upload on Timeline) |
 | [project.md](./project.md) | Product definition, behavior, data shapes (this file) |
 | [project-def-example.md](./project-def-example.md) | Reference template for this document's structure |
 | Data model & API sections | Future MVP 3 reference — not current implementation scope |
@@ -1385,3 +1423,7 @@ Build on MVP 1.5 without adding a backend:
 | 2026-08-09 | First-visit **Take a tour** CTA highlight on Home |
 | 2026-08-14 | **Feature search:** filter feature panel + Gantt rows by name or ID; auto-expand matching sections; not persisted |
 | 2026-08-14 | **Product focus:** highlight/dim (not hide); independent Team + Product sidebar controls; footer cross-team hint with tooltip; `filterProductId` in state |
+| 2026-08-15 | **Import features wizard:** CSV / spreadsheet paste into the active project; column mapping; product/team match; preview before confirm; creates/assigns products as needed |
+| 2026-08-15 | Empty workspace seed: keep SAFe calendar from PI 26.2 onward; remove mock projects, teams, products, and features. Setup wizard last step imports a feature list. |
+| 2026-08-15 | Getting started overlay sits above the Today marker; product tour highlights **Import**; Iterations plans start collapsed |
+| 2026-08-15 | **Dynamic day timeline:** today-centered ±90-day window, infinite horizontal scroll (±30 days per edge), weekend shading; SAFe plan bands merged when assigned; **Calendar ready** checklist step auto-completes with project |

@@ -119,8 +119,14 @@ export default function Sidebar({
             <select
               value={projectId}
               onChange={(e) => onProjectChange(e.target.value)}
-              className="mb-4 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white focus:border-violet-400 focus:outline-none"
+              disabled={projects.length === 0}
+              className="mb-4 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white focus:border-violet-400 focus:outline-none disabled:opacity-50"
             >
+              {projects.length === 0 && (
+                <option value="" className="text-gray-900">
+                  No project yet
+                </option>
+              )}
               {projects.map((p) => (
                 <option key={p.id} value={p.id} className="text-gray-900">
                   {p.name}

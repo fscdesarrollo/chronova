@@ -286,7 +286,7 @@ export function FeatureBarRow({
         ).map((unit) => (
           <div
             key={unit.index}
-            className="h-full border-r border-dotted border-gray-200"
+            className={`h-full border-r border-dotted border-gray-200 ${unit.sprintBg ?? ''}`}
             style={{ width: unit.width ?? WEEK_WIDTH }}
           />
         ))}

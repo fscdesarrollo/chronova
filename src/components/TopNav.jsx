@@ -1,10 +1,11 @@
-import { Plus, Settings } from 'lucide-react'
+import { Plus, Settings, Upload } from 'lucide-react'
 
 export default function TopNav({
   pageTitle,
   planLabel,
   focusProduct,
   onAddFeature,
+  onImportFeatures,
   onOpenGanttSettings,
   showAddFeature = true,
   showPlanLabel = false,
@@ -12,6 +13,8 @@ export default function TopNav({
   variant = 'light',
   addFeatureDisabled = false,
   addFeatureHint,
+  importDisabled = false,
+  importHint,
 }) {
   const isDark = variant === 'dark'
 
@@ -58,6 +61,23 @@ export default function TopNav({
             >
               <Settings size={18} />
             </button>
+            {onImportFeatures && (
+              <button
+                type="button"
+                data-tour="import-features"
+                onClick={onImportFeatures}
+                title={importHint ?? 'Import features from CSV'}
+                disabled={importDisabled}
+                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm transition-colors ${
+                  importDisabled
+                    ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
+                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+              >
+                <Upload size={16} />
+                Import
+              </button>
+            )}
             <button
               type="button"
               onClick={onAddFeature}

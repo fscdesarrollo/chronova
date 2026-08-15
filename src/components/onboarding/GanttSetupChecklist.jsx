@@ -6,6 +6,7 @@ export default function GanttSetupChecklist({
   onDismiss,
   onStartWizard,
   onNavigate,
+  onImportFeatures,
 }) {
   if (!readiness || readiness.isComplete) return null
 
@@ -27,7 +28,7 @@ export default function GanttSetupChecklist({
   }
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center p-6">
+    <div className="pointer-events-none absolute inset-0 z-40 flex items-start justify-center p-6">
       <div className="pointer-events-auto w-full max-w-md rounded-xl border border-violet-200/40 bg-white/95 p-5 shadow-xl backdrop-blur-sm">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
@@ -92,7 +93,7 @@ export default function GanttSetupChecklist({
           <span>
             {readiness.completedCount} of {readiness.totalSteps} complete
           </span>
-          {!readiness.steps.project && (
+          {!readiness.steps.project ? (
             <button
               type="button"
               onClick={() => onStartWizard?.()}
@@ -100,6 +101,16 @@ export default function GanttSetupChecklist({
             >
               Run setup wizard
             </button>
+          ) : (
+            onImportFeatures && (
+              <button
+                type="button"
+                onClick={onImportFeatures}
+                className="font-medium text-violet-600 hover:text-violet-700"
+              >
+                Import a feature list
+              </button>
+            )
           )}
         </div>
       </div>

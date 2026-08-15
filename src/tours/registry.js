@@ -46,6 +46,13 @@ export const TOURS = {
         body: 'This is the center of Chronova. Plan features across sprints, drag bars, and track deviations.',
       },
       {
+        id: 'import',
+        page: 'timeline',
+        target: '[data-tour="import-features"]',
+        title: 'Import a feature list',
+        body: 'Bring work from Excel or Google Sheets. Download the example CSV, map columns, match products and teams, then preview before anything is saved. New products are created and assigned to this project.',
+      },
+      {
         id: 'projects',
         page: 'projects',
         target: '[data-tour="page-main"]',
@@ -85,7 +92,7 @@ export const TOURS = {
         type: 'action',
         action: 'setup-prompt',
         title: 'Ready to plan?',
-        body: 'Run the setup wizard to create a project, calendar, team, and your first feature on the Gantt.',
+        body: 'Run the setup wizard to create a project and team, then import a feature list onto the Gantt.',
       },
     ],
   },

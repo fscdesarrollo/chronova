@@ -4,6 +4,7 @@ import TopNav from './components/TopNav'
 import TimelineGrid from './components/TimelineGrid'
 import Footer from './components/Footer'
 import AddFeatureModal from './components/AddFeatureModal'
+import ImportFeaturesWizard from './components/ImportFeaturesWizard'
 import GanttSettingsModal from './components/GanttSettingsModal'
 import FeatureDetailPanel from './components/FeatureDetailPanel'
 import ProjectsPage from './components/pages/ProjectsPage'
@@ -36,6 +37,7 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(getInitialPage)
   const [onboarding, setOnboarding] = useState(loadOnboarding)
   const [showWizard, setShowWizard] = useState(false)
+  const [showImportWizard, setShowImportWizard] = useState(false)
   const [activeTourId, setActiveTourId] = useState(null)
   const [navMemory, setNavMemory] = useState(loadNavigation)
   const timeline = useTimelineState()
@@ -54,6 +56,12 @@ export default function App() {
       setOnboarding(loadOnboarding())
     }
   }, [readiness.isComplete, onboarding.wizardCompleted])
+
+  useEffect(() => {
+    if (!onboarding.wizardCompleted && timeline.projects.length === 0) {
+      setShowWizard(true)
+    }
+  }, [onboarding.wizardCompleted, timeline.projects.length])
 
   const navigateToPage = (page) => {
     setCurrentPage(page)
@@ -105,25 +113,22 @@ export default function App() {
 
   const handleWizardComplete = (payload) => {
     timeline.setActor(payload.userName)
-    const result = timeline.setupProjectForGantt({
+    timeline.setupProjectForGantt({
       projectName: payload.projectName,
       teamName: payload.teamName,
-      featureName: payload.featureName,
-      calendarStartDate: payload.calendarStartDate,
     })
     markWizardCompleted()
     setOnboarding(loadOnboarding())
     setShowWizard(false)
     navigateToPage('timeline')
-    if (result.feature?.id) {
-      timeline.setSelectedFeatureId(result.feature.id)
-      if (result.feature.startDate) {
-        timeline.requestScrollToDate(result.feature.startDate)
-      }
+    if (payload.importFeatures) {
+      setShowImportWizard(true)
     }
   }
 
   const handleWizardSkip = () => {
+    markWizardCompleted()
+    setOnboarding(loadOnboarding())
     setShowWizard(false)
   }
 
@@ -142,11 +147,20 @@ export default function App() {
   }
 
   const handleAddFeature = () => {
-    if (!readiness.canAddFeature) {
+    if (!timeline.projectId) {
       setShowWizard(true)
       return
     }
+    if (!readiness.canAddFeature) {
+      requestProtectedAction(() => setShowImportWizard(true))
+      return
+    }
     requestProtectedAction(() => timeline.setShowAddModal(true))
+  }
+
+  const handleImportFeatures = () => {
+    if (!timeline.projectId) return
+    requestProtectedAction(() => setShowImportWizard(true))
   }
 
   const renderMainContent = () => {
@@ -253,6 +267,7 @@ export default function App() {
                     setOnboarding(loadOnboarding())
                   }}
                   onStartWizard={() => setShowWizard(true)}
+                  onImportFeatures={handleImportFeatures}
                   onNavigate={(page, options) => {
                     navigateToPage(page)
                     if (options?.addFeature && readiness.canAddFeature) {
@@ -291,6 +306,7 @@ export default function App() {
                 onSelectFeature={requestSelectFeature}
                 onDeselectFeature={requestDeselectFeature}
                 highlightProductId={timeline.filterProductId}
+                onExtendRange={timeline.extendTimelineRange}
               />
               <Footer
                 features={timeline.ganttFeatures}
@@ -375,13 +391,18 @@ export default function App() {
           showFocusLabel={currentPage === 'timeline' && Boolean(timeline.filterProductId)}
           variant={currentPage === 'home' ? 'dark' : 'light'}
           onAddFeature={handleAddFeature}
+          onImportFeatures={handleImportFeatures}
+          importDisabled={!timeline.projectId}
+          importHint={!timeline.projectId ? 'Select a project before importing features.' : 'Import features from a CSV list'}
           onOpenGanttSettings={() => requestProtectedAction(() => timeline.setShowGanttSettings(true))}
           showAddFeature={currentPage === 'timeline'}
           addFeatureDisabled={!readiness.canAddFeature}
           addFeatureHint={
-            !readiness.canAddFeature
-              ? 'Add a product to this project before creating features.'
-              : undefined
+            !timeline.projectId
+              ? 'Set up a project first.'
+              : !readiness.canAddFeature
+                ? 'Import a feature list or add a product to this project first.'
+                : undefined
           }
         />
 
@@ -397,6 +418,18 @@ export default function App() {
         defaultProductId={timeline.filterProductId ?? undefined}
         defaultDates={defaultDates}
         canPlanOnGantt={readiness.canAddPlannedFeature}
+      />
+
+      <ImportFeaturesWizard
+        open={showImportWizard}
+        projectId={timeline.projectId}
+        projectName={timeline.projects.find((p) => p.id === timeline.projectId)?.name}
+        products={timeline.products}
+        projectProducts={timeline.projectProducts}
+        teams={timeline.teams}
+        projectTeams={timeline.projectTeams}
+        onClose={() => setShowImportWizard(false)}
+        onImport={timeline.importFeatures}
       />
 
       <GanttSettingsModal

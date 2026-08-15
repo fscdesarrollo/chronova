@@ -1,18 +1,12 @@
 import {
+  DATA_REVISION,
   DEFAULT_PROJECT_ID,
-  seedFeatures,
   seedIterationPlans,
-  seedProducts,
-  seedProjectIterationPlans,
-  seedProjectProducts,
-  seedProjectTeams,
-  seedProjects,
   seedSprints,
-  seedTeams,
   seedTimeboxes,
 } from '../data'
 import { defaultFormattingRulesForProject, normalizeFormattingRules } from './formattingRules'
-import { parseFeatureId, resetIdCounters, resetMarkerCounter } from './ids'
+import { parseFeatureId, resetIdCounters } from './ids'
 
 export function isPlannedFeature(feature) {
   return feature.planningStatus === 'planned'
@@ -52,48 +46,50 @@ export function migrateViewMode(saved) {
 }
 
 export function migrateState(saved) {
-  if (!saved) {
+  if (!saved || saved.dataRevision !== DATA_REVISION) {
     return buildFreshState()
   }
 
-  if (saved.projects?.length) {
-    const { products, projectProducts } = migrateProductsToJunction(saved)
-    resetIdCounters({
-      ...saved,
-      products,
-      iterationPlans: saved.iterationPlans ?? seedIterationPlans,
-      timeboxes: saved.timeboxes ?? seedTimeboxes,
-      sprints: saved.sprints ?? seedSprints,
-    })
-    const projects = saved.projects
-    const formattingRules = migrateFormattingRules(saved.formattingRules, projects)
-    const { viewMode, filterTeamId, filterProductId } = migrateViewMode(saved)
-    const normalizedFeatures = (saved.features ?? []).map(normalizeFeature)
-    const { features, auditEvents } = migrateNumericFeatureIds(
-      normalizedFeatures,
-      saved.auditEvents ?? [],
-    )
-    const iterationState = migrateIterationPlans(saved, projects)
-    return {
-      projects,
-      teams: saved.teams ?? seedTeams,
-      projectTeams: saved.projectTeams ?? seedProjectTeams,
-      products,
-      projectProducts,
-      ...iterationState,
-      features,
-      timelineMarkers: saved.timelineMarkers ?? [],
-      formattingRules,
-      auditEvents,
-      projectId: saved.projectId ?? saved.projects[0]?.id ?? DEFAULT_PROJECT_ID,
-      viewMode,
-      filterTeamId,
-      filterProductId,
-      collapsedSections: saved.collapsedSections ?? {},
-    }
-  }
+  const projects = saved.projects ?? []
+  const { products, projectProducts } = migrateProductsToJunction(saved)
+  resetIdCounters({
+    ...saved,
+    products,
+    iterationPlans: saved.iterationPlans ?? seedIterationPlans,
+    timeboxes: saved.timeboxes ?? seedTimeboxes,
+    sprints: saved.sprints ?? seedSprints,
+  })
+  const formattingRules = migrateFormattingRules(saved.formattingRules, projects)
+  const { viewMode, filterTeamId, filterProductId } = migrateViewMode(saved)
+  const normalizedFeatures = (saved.features ?? []).map(normalizeFeature)
+  const { features, auditEvents } = migrateNumericFeatureIds(
+    normalizedFeatures,
+    saved.auditEvents ?? [],
+  )
+  const iterationState = migrateIterationPlans(saved, projects)
+  const projectId =
+    saved.projectId && projects.some((p) => p.id === saved.projectId)
+      ? saved.projectId
+      : (projects[0]?.id ?? '')
 
-  return migrateLegacyState(saved)
+  return {
+    projects,
+    teams: saved.teams ?? [],
+    projectTeams: saved.projectTeams ?? [],
+    products,
+    projectProducts,
+    ...iterationState,
+    features,
+    timelineMarkers: saved.timelineMarkers ?? [],
+    formattingRules,
+    auditEvents,
+    projectId,
+    viewMode,
+    filterTeamId,
+    filterProductId,
+    collapsedSections: saved.collapsedSections ?? {},
+    dataRevision: DATA_REVISION,
+  }
 }
 
 function migrateFormattingRules(savedRules, projects) {
@@ -104,53 +100,46 @@ function migrateFormattingRules(savedRules, projects) {
 }
 
 function migrateProductsToJunction(saved) {
-  if (saved.projectProducts?.length) {
+  if (Array.isArray(saved.projectProducts)) {
     return {
       products: (saved.products ?? []).map(normalizeProduct),
       projectProducts: saved.projectProducts,
     }
   }
 
-  const products = (saved.products ?? seedProducts).map((p) => {
+  const products = (saved.products ?? []).map((p) => {
     const { projectId: _removed, ...rest } = normalizeProduct(p)
     return rest
   })
 
-  const projectProducts = (saved.products ?? seedProducts)
+  const projectProducts = (saved.products ?? [])
     .filter((p) => p.projectId)
     .map((p) => ({ projectId: p.projectId, productId: p.id }))
-
-  if (!projectProducts.length && products.length) {
-    return {
-      products,
-      projectProducts: seedProjectProducts,
-    }
-  }
 
   return { products, projectProducts }
 }
 
-function buildFreshState() {
-  const features = seedFeatures.map(normalizeFeature)
+export function buildFreshState() {
   return {
-    projects: seedProjects,
-    teams: seedTeams,
-    projectTeams: seedProjectTeams,
-    products: seedProducts.map(normalizeProduct),
-    projectProducts: seedProjectProducts,
+    projects: [],
+    teams: [],
+    projectTeams: [],
+    products: [],
+    projectProducts: [],
     iterationPlans: seedIterationPlans,
     timeboxes: seedTimeboxes,
     sprints: seedSprints,
-    projectIterationPlans: seedProjectIterationPlans,
-    features,
+    projectIterationPlans: [],
+    features: [],
     timelineMarkers: [],
-    formattingRules: seedProjects.flatMap((p) => defaultFormattingRulesForProject(p.id)),
+    formattingRules: [],
     auditEvents: [],
-    projectId: DEFAULT_PROJECT_ID,
+    projectId: '',
     viewMode: 'all',
     filterTeamId: null,
     filterProductId: null,
     collapsedSections: {},
+    dataRevision: DATA_REVISION,
   }
 }
 
@@ -213,42 +202,6 @@ function normalizeSprint(s) {
     scale: s.scale === 'day' || s.scale === 'month' || s.scale === 'week' ? s.scale : 'week',
     name: s.name || s.id,
   }
-}
-
-function migrateLegacyState(saved) {
-  const normalized = (saved.features?.length ? saved.features : seedFeatures).map((f) => ({
-    ...normalizeFeature(f),
-    projectId: f.projectId ?? DEFAULT_PROJECT_ID,
-    assignmentStatus: f.assignmentStatus ?? 'ok',
-  }))
-  const { features, auditEvents } = migrateNumericFeatureIds(
-    normalized,
-    saved.auditEvents ?? [],
-  )
-
-  const state = {
-    projects: seedProjects,
-    teams: seedTeams,
-    projectTeams: seedProjectTeams,
-    products: seedProducts.map(normalizeProduct),
-    projectProducts: seedProjectProducts,
-    iterationPlans: seedIterationPlans,
-    timeboxes: seedTimeboxes,
-    sprints: seedSprints,
-    projectIterationPlans: seedProjectIterationPlans,
-    features,
-    timelineMarkers: saved.timelineMarkers ?? [],
-    formattingRules: seedProjects.flatMap((p) => defaultFormattingRulesForProject(p.id)),
-    auditEvents,
-    projectId: DEFAULT_PROJECT_ID,
-    viewMode: 'all',
-    filterTeamId: null,
-    filterProductId: null,
-    collapsedSections: {},
-  }
-
-  resetIdCounters(state)
-  return state
 }
 
 /** Convert legacy `F-*` (or string) feature ids to integer identity values. */

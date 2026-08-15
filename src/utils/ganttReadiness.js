@@ -1,5 +1,4 @@
 import { isOnGantt, productIdsForProject } from './migration'
-import { planIdForProject } from './iterationPlans'
 
 export const GANTT_SETUP_STEPS = [
   { id: 'project', label: 'Project created' },
@@ -12,15 +11,11 @@ export const GANTT_SETUP_STEPS = [
 export function getProjectGanttReadiness({
   projectId,
   projects,
-  projectIterationPlans,
-  timeboxes,
   projectProducts,
   projectTeams,
   features,
 }) {
   const project = projects.find((p) => p.id === projectId)
-  const planId = project ? planIdForProject(projectIterationPlans, projectId) : null
-  const planTimeboxes = planId ? timeboxes.filter((t) => t.planId === planId && t.startDate) : []
   const productIds = projectId ? productIdsForProject(projectProducts, projectId) : new Set()
   const teamCount = projectTeams.filter((pt) => pt.projectId === projectId).length
   const projectFeatures = features.filter((f) => f.projectId === projectId)
@@ -28,7 +23,8 @@ export function getProjectGanttReadiness({
 
   const steps = {
     project: Boolean(project),
-    calendar: Boolean(planId && planTimeboxes.length > 0),
+    // Timeline is always available once a project exists (generic day grid + optional SAFe plan).
+    calendar: Boolean(project),
     product: productIds.size > 0,
     team: teamCount > 0,
     feature: ganttFeatureCount > 0,
@@ -36,8 +32,8 @@ export function getProjectGanttReadiness({
 
   const completedCount = Object.values(steps).filter(Boolean).length
   const canAddFeature = steps.project && steps.product
-  const canAddPlannedFeature = steps.project && steps.calendar && steps.product && steps.team
-  const isReady = steps.project && steps.calendar && steps.product && steps.team
+  const canAddPlannedFeature = steps.project && steps.product && steps.team
+  const isReady = steps.project && steps.product && steps.team
 
   return {
     steps,

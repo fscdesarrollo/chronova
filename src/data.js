@@ -3,34 +3,18 @@ import {
   getDefaultFeatureDatesFromPlan,
 } from './utils/iterationPlans'
 
-export const DEFAULT_PROJECT_ID = 'proj-carb'
-export const DEFAULT_PLAN_ID = 'plan-carb-2026'
+/** Bump to drop demo localStorage and start from a calendar-only workspace. */
+export const DATA_REVISION = 2
 
-export const seedProjects = [
-  { id: DEFAULT_PROJECT_ID, name: 'CARB Platform', createdAt: new Date().toISOString() },
-]
+export const DEFAULT_PROJECT_ID = ''
+export const DEFAULT_PLAN_ID = 'plan-safe-2026'
 
-export const seedTeams = [
-  { id: 'carb-dp', name: 'CARB Data Platform', createdAt: new Date().toISOString() },
-  { id: 'carb-api', name: 'API Integration Team', createdAt: new Date().toISOString() },
-]
-
-export const seedProjectTeams = [
-  { projectId: DEFAULT_PROJECT_ID, teamId: 'carb-dp' },
-  { projectId: DEFAULT_PROJECT_ID, teamId: 'carb-api' },
-]
-
-export const seedProducts = [
-  { id: 'prod-a', name: 'Product A', color: '#3B82F6', createdAt: new Date().toISOString() },
-  { id: 'prod-b', name: 'Product B', color: '#10B981', createdAt: new Date().toISOString() },
-  { id: 'prod-c', name: 'Product C', color: '#FB923C', createdAt: new Date().toISOString() },
-  { id: 'prod-d', name: 'Product D', color: '#8B5CF6', createdAt: new Date().toISOString() },
-]
-
-export const seedProjectProducts = seedProducts.map((p) => ({
-  projectId: DEFAULT_PROJECT_ID,
-  productId: p.id,
-}))
+export const seedProjects = []
+export const seedTeams = []
+export const seedProjectTeams = []
+export const seedProducts = []
+export const seedProjectProducts = []
+export const seedFeatures = []
 
 export const teams = seedTeams
 export const products = seedProducts
@@ -38,7 +22,7 @@ export const products = seedProducts
 export const seedIterationPlans = [
   {
     id: DEFAULT_PLAN_ID,
-    name: 'CARB ART 2026',
+    name: 'SAFe 2026',
     methodology: 'safe',
     createdAt: new Date().toISOString(),
   },
@@ -102,9 +86,7 @@ export const seedSprints = [
   seedSprint('26.4.4', '26.4', 4, '2027-01-06', '2027-02-02', 4, 'INNOVATION'),
 ]
 
-export const seedProjectIterationPlans = [
-  { projectId: DEFAULT_PROJECT_ID, planId: DEFAULT_PLAN_ID },
-]
+export const seedProjectIterationPlans = []
 
 const seedCalendar = buildCalendarFromPlan(seedTimeboxes, seedSprints)
 export const weekCalendar = seedCalendar.weeks
@@ -115,66 +97,6 @@ export const sprints = seedCalendar.sprints
 
 export const CURRENT_PI_ID = '26.3'
 export const CURRENT_PI_START_WEEK = PI_START_WEEK_MAP[CURRENT_PI_ID] ?? 0
-
-function seedFeature(id, name, productId, startWeekOffset, duration, completed, userStories = []) {
-  const startWeek = CURRENT_PI_START_WEEK + startWeekOffset
-  const endWeek = startWeek + duration - 1
-  const startDate = weekCalendar[startWeek].startDate
-  const targetDate = weekCalendar[endWeek].endDate
-  const storyPoints = userStories.reduce((sum, us) => sum + (us.storyPoints || 0), 0)
-
-  return {
-    id,
-    projectId: DEFAULT_PROJECT_ID,
-    teamId: 'carb-dp',
-    productId,
-    name,
-    startDate,
-    targetDate,
-    completed,
-    crossPi: false,
-    assignmentStatus: 'ok',
-    storyPoints,
-    userStories,
-    sortOrder: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }
-}
-
-export const seedFeatures = [
-  seedFeature(1, 'Terminal Report - Production Dashboard', 'prod-a', 0, 5, false, [
-    { id: 1, title: 'Dashboard layout', storyPoints: 5 },
-    { id: 2, title: 'Data connectors', storyPoints: 8 },
-  ]),
-  seedFeature(2, 'CARB at Berth - Vessel Calculator', 'prod-b', 1, 4, true, [
-    { id: 1, title: 'Calculator core', storyPoints: 8 },
-  ]),
-  seedFeature(3, 'Emissions Data Pipeline v2', 'prod-c', 2, 6, false, [
-    { id: 1, title: 'Pipeline refactor', storyPoints: 13 },
-    { id: 2, title: 'Validation layer', storyPoints: 8 },
-  ]),
-  seedFeature(4, 'Port Authority API Integration', 'prod-d', 3, 3, false),
-  seedFeature(5, 'Vessel Tracking Real-time Feed', 'prod-a', 4, 4, false),
-  seedFeature(6, 'Compliance Report Generator', 'prod-b', 5, 5, false),
-  seedFeature(7, 'Carbon Credit Allocation Module', 'prod-c', 6, 4, false),
-  seedFeature(8, 'Berth Scheduling Optimizer', 'prod-d', 7, 3, true),
-  seedFeature(9, 'Data Quality Monitoring Suite', 'prod-a', 8, 5, false),
-  seedFeature(10, 'Fleet Analytics Dashboard', 'prod-b', 9, 4, false),
-  seedFeature(11, 'Regulatory Submission Portal', 'prod-c', 10, 3, false),
-  seedFeature(12, 'Innovation Hub - AI Forecasting', 'prod-d', 11, 2, false),
-  seedFeature(13, 'Innovation Hub - ML Model Training', 'prod-a', 11, 2, false),
-  seedFeature(14, 'PI Planning - Capacity Review', 'prod-b', 12, 1, false),
-  seedFeature(15, 'PI Planning - Dependency Mapping', 'prod-c', 12, 1, false),
-  seedFeature(16, 'Historical Data Migration', 'prod-a', 0, 3, true),
-  seedFeature(17, 'Notification Service Upgrade', 'prod-d', 2, 2, false),
-  seedFeature(18, 'Audit Trail Enhancement', 'prod-b', 4, 4, false),
-  {
-    ...seedFeature(19, 'Cross-PI Data Lake Migration', 'prod-a', 11, 3, false),
-    targetDate: weekCalendar[CURRENT_PI_START_WEEK + 14].endDate,
-    crossPi: true,
-  },
-].map((f, i) => ({ ...f, sortOrder: i }))
 
 export function getProductById(productId, productList = seedProducts) {
   return productList.find((p) => p.id === productId)

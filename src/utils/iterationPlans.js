@@ -82,12 +82,12 @@ function daysInclusive(startDate, endDate) {
   return Math.max(1, Math.round((end - start) / (24 * 60 * 60 * 1000)) + 1)
 }
 
-function monthKey(iso) {
+export function monthKey(iso) {
   const d = parseISO(iso)
   return `${d.getFullYear()}-${d.getMonth()}`
 }
 
-function monthLabel(iso) {
+export function monthLabel(iso) {
   const d = parseISO(iso)
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   return `${months[d.getMonth()]} ${d.getFullYear()}`
@@ -279,10 +279,13 @@ export function findCurrentTimebox(timeboxes = [], todayIso = toISODate(new Date
   return future[0] ?? null
 }
 
-export function getDefaultFeatureDatesFromPlan(timeboxes = []) {
-  const current = findCurrentTimebox(timeboxes)
+export function getDefaultFeatureDatesFromPlan(timeboxes = [], todayIso = toISODate(new Date())) {
+  const current = findCurrentTimebox(timeboxes, todayIso)
   if (!current?.startDate) {
-    return { startDate: '', targetDate: '' }
+    return {
+      startDate: todayIso,
+      targetDate: addWeeks(todayIso, 1),
+    }
   }
   return {
     startDate: current.startDate,

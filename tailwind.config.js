@@ -12,6 +12,11 @@ export default {
           innovation: '#6b4c9a',
           planning: '#1e2230',
         },
+        timeline: {
+          day: '#ffffff',
+          weekend: '#f3f4f6',
+          'weekend-header': '#2a3142',
+        },
       },
     },
   },

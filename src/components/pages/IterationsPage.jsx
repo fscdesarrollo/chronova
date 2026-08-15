@@ -24,7 +24,7 @@ export default function IterationsPage({
   const [newPlanName, setNewPlanName] = useState('')
   const [editingPlanId, setEditingPlanId] = useState(null)
   const [editPlanName, setEditPlanName] = useState('')
-  const [expandedPlanId, setExpandedPlanId] = useState(iterationPlans[0]?.id ?? null)
+  const [expandedPlanId, setExpandedPlanId] = useState(null)
   const [newTimeboxName, setNewTimeboxName] = useState('')
   const [newTimeboxStart, setNewTimeboxStart] = useState('')
   const [error, setError] = useState('')

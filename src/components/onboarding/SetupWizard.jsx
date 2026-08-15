@@ -1,23 +1,21 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowRight, BarChart3, Check, Sparkles, User, Users, FolderKanban } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Download, FolderKanban, Sparkles, Upload, User, Users } from 'lucide-react'
 import { APP_NAME, APP_TAGLINE } from '../../brand'
 import BrandWordmark from '../BrandWordmark'
-import { suggestCalendarStartDate } from '../../utils/dates'
+import { downloadFeatureImportTemplate } from '../../utils/featureImport'
 
 const STEPS = [
   { id: 'user', title: 'Your name', icon: User },
   { id: 'project', title: 'Project', icon: FolderKanban },
   { id: 'team', title: 'Team', icon: Users },
-  { id: 'feature', title: 'First feature', icon: BarChart3 },
+  { id: 'import', title: 'Import features', icon: Upload },
 ]
 
 export default function SetupWizard({ open, initialUserName = '', onComplete, onSkip }) {
   const [stepIndex, setStepIndex] = useState(0)
   const [userName, setUserName] = useState(initialUserName)
   const [projectName, setProjectName] = useState('')
-  const [calendarStartDate, setCalendarStartDate] = useState(suggestCalendarStartDate())
   const [teamName, setTeamName] = useState('')
-  const [featureName, setFeatureName] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -25,9 +23,7 @@ export default function SetupWizard({ open, initialUserName = '', onComplete, on
     setStepIndex(0)
     setUserName(initialUserName)
     setProjectName('')
-    setCalendarStartDate(suggestCalendarStartDate())
     setTeamName('')
-    setFeatureName('')
     setError('')
   }, [open, initialUserName])
 
@@ -35,6 +31,15 @@ export default function SetupWizard({ open, initialUserName = '', onComplete, on
 
   const step = STEPS[stepIndex]
   const isLast = stepIndex === STEPS.length - 1
+
+  const finish = (importFeatures) => {
+    onComplete({
+      userName: userName.trim(),
+      projectName: projectName.trim(),
+      teamName: teamName.trim(),
+      importFeatures,
+    })
+  }
 
   const goNext = () => {
     setError('')
@@ -50,22 +55,10 @@ export default function SetupWizard({ open, initialUserName = '', onComplete, on
       setError('Enter a team name.')
       return
     }
-    if (step.id === 'feature' && !featureName.trim()) {
-      setError('Enter a feature name to place on the Gantt.')
-      return
-    }
-
     if (isLast) {
-      onComplete({
-        userName: userName.trim(),
-        projectName: projectName.trim(),
-        teamName: teamName.trim(),
-        featureName: featureName.trim(),
-        calendarStartDate,
-      })
+      finish(true)
       return
     }
-
     setStepIndex((prev) => prev + 1)
   }
 
@@ -86,7 +79,7 @@ export default function SetupWizard({ open, initialUserName = '', onComplete, on
           </div>
           <BrandWordmark className="mb-4 text-2xl" />
           <p className="text-sm text-gray-400">
-            Set up your workspace and place your first feature on the Gantt.
+            Set up your workspace, then import a feature list or open an empty Gantt.
           </p>
           <div className="mt-4 flex gap-2">
             {STEPS.map((item, index) => (
@@ -128,30 +121,19 @@ export default function SetupWizard({ open, initialUserName = '', onComplete, on
           )}
 
           {step.id === 'project' && (
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1 block text-xs text-gray-400">Project name</label>
-                <input
-                  type="text"
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  placeholder="e.g. Platform Modernization"
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:border-violet-400 focus:outline-none"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs text-gray-400">Calendar start date</label>
-                <input
-                  type="date"
-                  value={calendarStartDate}
-                  onChange={(e) => setCalendarStartDate(e.target.value)}
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-violet-400 focus:outline-none"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  We&apos;ll create a SAFe PI calendar starting on this date.
-                </p>
-              </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-400">Project name</label>
+              <input
+                type="text"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder="e.g. Platform Modernization"
+                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:border-violet-400 focus:outline-none"
+                autoFocus
+              />
+              <p className="mt-2 text-xs text-gray-500">
+                We&apos;ll attach the SAFe calendar starting at PI 26.2 (6 May – 4 Aug 2026).
+              </p>
             </div>
           )}
 
@@ -167,25 +149,30 @@ export default function SetupWizard({ open, initialUserName = '', onComplete, on
                 autoFocus
               />
               <p className="mt-2 text-xs text-gray-500">
-                Teams own features on the Gantt. You can add more later.
+                Use this same name in your CSV if those features should be planned on the Gantt.
               </p>
             </div>
           )}
 
-          {step.id === 'feature' && (
-            <div>
-              <label className="mb-1 block text-xs text-gray-400">First feature name</label>
-              <input
-                type="text"
-                value={featureName}
-                onChange={(e) => setFeatureName(e.target.value)}
-                placeholder="e.g. API gateway rollout"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:border-violet-400 focus:outline-none"
-                autoFocus
-              />
-              <p className="mt-2 text-xs text-gray-500">
-                We&apos;ll place it on the timeline with your team and default PI dates.
+          {step.id === 'import' && (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-300">
+                Import a CSV list into <span className="font-medium text-white">{projectName || 'this project'}</span>.
+                You will map columns and preview rows before anything is saved.
               </p>
+              <ul className="list-disc space-y-1 pl-5 text-xs text-gray-500">
+                <li>Feature name and product are required. Team and dates are optional.</li>
+                <li>New products are created and assigned to this project.</li>
+                <li>Rows that use the team “{teamName || 'your team'}” are planned; unknown teams go to backlog.</li>
+              </ul>
+              <button
+                type="button"
+                onClick={downloadFeatureImportTemplate}
+                className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-gray-200 hover:bg-white/5"
+              >
+                <Download size={14} />
+                Download example CSV
+              </button>
             </div>
           )}
         </div>
@@ -209,6 +196,15 @@ export default function SetupWizard({ open, initialUserName = '', onComplete, on
                 Back
               </button>
             )}
+            {isLast && (
+              <button
+                type="button"
+                onClick={() => finish(false)}
+                className="rounded-lg border border-white/10 px-3 py-2 text-sm text-gray-300 hover:bg-white/5"
+              >
+                Skip and open Gantt
+              </button>
+            )}
             <button
               type="button"
               onClick={goNext}
@@ -216,8 +212,8 @@ export default function SetupWizard({ open, initialUserName = '', onComplete, on
             >
               {isLast ? (
                 <>
-                  <Check size={14} />
-                  Open Gantt
+                  <Upload size={14} />
+                  Import features
                 </>
               ) : (
                 <>

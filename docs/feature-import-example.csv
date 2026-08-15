@@ -1,0 +1,9 @@
+Feature name,Product,Team,Start date,Target date,Notes
+Port Call Summary Widget,Platform,Platform Team,2026-08-05,2026-09-15,Planned example — use the same team name you entered in setup
+Berth Occupancy API,Integrations,Platform Team,2026-08-26,2026-10-06,Planned example on a second product
+Emissions Forecast v3,Analytics,Platform Team,2026-09-16,2026-11-03,Spans later sprints in PI 26.3
+Fleet Alerts Digest,Platform,,,,Backlog example — no team or dates
+Partner Portal SSO,Portal,,,,New product — the wizard will create Portal and assign it
+Shore Power Calculator,Platform,Platform Team,2026-05-06,2026-05-26,Short feature in PI 26.2
+Regulatory Pack Export,Analytics,,,,Backlog — assign a team later in the detail panel
+Webhook Retry Service,Integrations,Platform Team,2026-10-07,2026-11-03,"Notes may include commas, as long as the cell is quoted"

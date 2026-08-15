@@ -6,13 +6,14 @@ import TimelineHeader from './TimelineHeader'
 import { TodayBodyLine, TimelineMarkerBodyLine } from './TimelineMarkers'
 import { useFeatureDrag, ROW_HEIGHT } from '../hooks/useFeatureDrag'
 import { useLeftColResize } from '../hooks/useLeftColResize'
-import { LEFT_COL_COLLAPSED_WIDTH, SECTION_ROW_HEIGHT, WEEK_WIDTH } from '../constants'
+import { DAY_WIDTH, LEFT_COL_COLLAPSED_WIDTH, SECTION_ROW_HEIGHT, WEEK_WIDTH } from '../constants'
 import { loadTimelineView, saveTimelineView } from '../utils/storage'
 import {
   getDateTimelinePosition,
   getTodayTimelinePosition,
   scrollLeftForToday,
 } from '../utils/weekCalendar'
+import { daysBetween, DYNAMIC_CALENDAR } from '../utils/dynamicCalendar'
 import { rowHeightFor } from '../utils/timelineLayout'
 import { buildGroupedMarkerLayout } from '../utils/markerGroups'
 import { evaluateFormattingRules } from '../utils/formattingRules'
@@ -46,14 +47,12 @@ export default function TimelineGrid({
   onDeselectFeature,
   highlightProductId = null,
   emptyMessage = 'No features yet. Use "Add Feature" to get started.',
+  onExtendRange,
 }) {
   const weekCalendar = calendar?.weeks ?? []
   const totalWeeks = calendar?.totalWeeks ?? 0
   const totalWidth = calendar?.totalWidth
     ?? weekCalendar.reduce((s, w) => s + (w.width ?? WEEK_WIDTH), 0)
-  const currentStartWeek = calendar?.currentTimeboxStartWeek ?? calendar?.timeboxes?.[0]?.startWeek ?? 0
-  const fallbackScrollLeft = weekCalendar[currentStartWeek]?.left
-    ?? currentStartWeek * WEEK_WIDTH
   const effectiveColWidth = leftColCollapsed ? LEFT_COL_COLLAPSED_WIDTH : leftColWidth
   const leftBodyRef = useRef(null)
   const headerScrollRef = useRef(null)
@@ -61,6 +60,8 @@ export default function TimelineGrid({
   const scrollInitializedRef = useRef(false)
   const suppressScrollTrackingRef = useRef(false)
   const shouldPersistViewRef = useRef(false)
+  const extendingRangeRef = useRef(false)
+  const prevRangeStartRef = useRef(null)
   const scrollPositionRef = useRef({ scrollLeft: 0, scrollTop: 0 })
   const [expandedMarkerDates, setExpandedMarkerDates] = useState(() => new Set())
   const [featureSearchQuery, setFeatureSearchQuery] = useState('')
@@ -158,9 +159,23 @@ export default function TimelineGrid({
     scrollInitializedRef.current = false
     shouldPersistViewRef.current = false
     scrollPositionRef.current = { scrollLeft: 0, scrollTop: 0 }
+    prevRangeStartRef.current = null
     setExpandedMarkerDates(new Set())
     setFeatureSearchQuery('')
   }, [projectId])
+
+  useEffect(() => {
+    const grid = gridRef.current
+    if (!grid || !calendar?.rangeStart) return
+
+    const prevStart = prevRangeStartRef.current
+    if (prevStart && calendar.rangeStart < prevStart) {
+      const daysAdded = daysBetween(calendar.rangeStart, prevStart)
+      applyScroll(grid.scrollLeft + daysAdded * DAY_WIDTH, grid.scrollTop)
+      shouldPersistViewRef.current = true
+    }
+    prevRangeStartRef.current = calendar.rangeStart
+  }, [calendar?.rangeStart, applyScroll, gridRef])
 
   useEffect(() => {
     const grid = gridRef.current
@@ -171,17 +186,34 @@ export default function TimelineGrid({
       shouldPersistViewRef.current = true
       applyScroll(saved.scrollLeft, saved.scrollTop)
     } else {
-      const scrollLeft = scrollLeftForToday(
-        weekCalendar,
-        WEEK_WIDTH,
-        grid.clientWidth,
-        fallbackScrollLeft,
-      )
+      const scrollLeft = scrollLeftForToday(weekCalendar, WEEK_WIDTH, grid.clientWidth, 0)
       applyScroll(scrollLeft, 0)
     }
 
     scrollInitializedRef.current = true
-  }, [projectId, applyScroll, gridRef, weekCalendar, fallbackScrollLeft])
+  }, [projectId, applyScroll, gridRef, weekCalendar])
+
+  const maybeExtendRange = useCallback(() => {
+    const grid = gridRef.current
+    if (!grid || !onExtendRange || extendingRangeRef.current) return
+
+    const { scrollLeft, clientWidth, scrollWidth } = grid
+    const threshold = DYNAMIC_CALENDAR.EDGE_THRESHOLD_PX
+
+    if (scrollLeft < threshold) {
+      extendingRangeRef.current = true
+      onExtendRange('past', DYNAMIC_CALENDAR.SCROLL_CHUNK_DAYS)
+      requestAnimationFrame(() => {
+        extendingRangeRef.current = false
+      })
+    } else if (scrollLeft + clientWidth > scrollWidth - threshold) {
+      extendingRangeRef.current = true
+      onExtendRange('future', DYNAMIC_CALENDAR.SCROLL_CHUNK_DAYS)
+      requestAnimationFrame(() => {
+        extendingRangeRef.current = false
+      })
+    }
+  }, [gridRef, onExtendRange])
 
   useEffect(() => {
     if (!scrollToDate) return
@@ -221,8 +253,9 @@ export default function TimelineGrid({
       shouldPersistViewRef.current = true
     }
 
+    maybeExtendRange()
     syncScrollTop(gridRef.current, leftBodyRef.current)
-  }, [gridRef, syncScrollTop, syncHeaderScrollLeft])
+  }, [gridRef, syncScrollTop, syncHeaderScrollLeft, maybeExtendRange])
 
   const handleBackgroundPointerDown = useCallback(
     (e) => {
@@ -253,7 +286,7 @@ export default function TimelineGrid({
   }
 
   return (
-    <div data-timeline-split className="relative flex min-h-0 flex-1 flex-col">
+    <div data-timeline-split className="relative z-0 flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-stretch">
         <div style={{ width: effectiveColWidth }}>
           <FeaturePanelHeader
