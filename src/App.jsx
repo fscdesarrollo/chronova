@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Sidebar from './components/Sidebar'
 import TopNav from './components/TopNav'
+import TimelineToolbar from './components/TimelineToolbar'
 import TimelineGrid from './components/TimelineGrid'
 import Footer from './components/Footer'
 import AddFeatureModal from './components/AddFeatureModal'
@@ -40,6 +41,7 @@ export default function App() {
   const [showImportWizard, setShowImportWizard] = useState(false)
   const [activeTourId, setActiveTourId] = useState(null)
   const [navMemory, setNavMemory] = useState(loadNavigation)
+  const [featureSearchQuery, setFeatureSearchQuery] = useState('')
   const timeline = useTimelineState()
   const detailPanelRef = useRef(null)
 
@@ -106,6 +108,23 @@ export default function App() {
     : []
 
   const leftColWidth = timeline.layout.leftColWidth
+
+  const sidebarCollapsed =
+    currentPage === 'timeline'
+      ? (timeline.layout.sidebarCollapsedTimeline ?? true)
+      : (timeline.layout.sidebarCollapsed ?? false)
+
+  const handleToggleSidebarCollapsed = () => {
+    if (currentPage === 'timeline') {
+      timeline.setLayout({
+        sidebarCollapsedTimeline: !sidebarCollapsed,
+      })
+    } else {
+      timeline.setLayout({ sidebarCollapsed: !sidebarCollapsed })
+    }
+  }
+
+  const activeProject = timeline.projects.find((p) => p.id === timeline.projectId)
 
   const handleLeftColWidthChange = (width) => {
     timeline.setLayout({ leftColWidth: width })
@@ -299,15 +318,14 @@ export default function App() {
                   }
                 }}
                 onToggleSectionCollapsed={timeline.toggleSectionCollapsed}
-                onCollapseAllSections={timeline.collapseAllSections}
-                onExpandAllSections={timeline.expandAllSections}
+                searchQuery={featureSearchQuery}
+                onSearchChange={setFeatureSearchQuery}
                 onMove={timeline.moveFeature}
                 selectedFeatureId={timeline.selectedFeatureId}
                 onSelectFeature={requestSelectFeature}
                 onDeselectFeature={requestDeselectFeature}
                 highlightProductId={timeline.filterProductId}
                 onExtendRange={timeline.extendTimelineRange}
-                onScrollToToday={timeline.scrollToToday}
               />
               <Footer
                 features={timeline.ganttFeatures}
@@ -362,50 +380,62 @@ export default function App() {
       />
 
       <Sidebar
-        collapsed={timeline.layout.sidebarCollapsed}
-        onToggleCollapsed={() =>
-          timeline.setLayout({ sidebarCollapsed: !timeline.layout.sidebarCollapsed })
-        }
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={handleToggleSidebarCollapsed}
         currentPage={currentPage}
         onNavigate={navigateTo}
-        projects={timeline.projects}
-        projectId={timeline.projectId}
-        onProjectChange={handleProjectChange}
-        teamsForProject={timeline.teamsForProject}
-        productsForProject={timeline.productsForProject}
-        viewMode={timeline.viewMode}
-        filterTeamId={timeline.filterTeamId}
-        filterProductId={timeline.filterProductId}
-        onViewScopeChange={timeline.setViewScope}
-        onTeamFilterChange={timeline.setTeamFilter}
-        onProductFocusChange={timeline.setProductFocus}
         actor={timeline.actor}
         onActorChange={timeline.setActor}
+        activeProjectName={activeProject?.name}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopNav
-          pageTitle={PAGE_TITLES[currentPage] ?? 'Timeline'}
-          planLabel={timeline.activePlan?.name}
-          focusProduct={timeline.focusedProduct}
-          showPlanLabel={currentPage === 'timeline'}
-          showFocusLabel={currentPage === 'timeline' && Boolean(timeline.filterProductId)}
-          variant={currentPage === 'home' ? 'dark' : 'light'}
-          onAddFeature={handleAddFeature}
-          onImportFeatures={handleImportFeatures}
-          importDisabled={!timeline.projectId}
-          importHint={!timeline.projectId ? 'Select a project before importing features.' : 'Import features from a CSV list'}
-          onOpenGanttSettings={() => requestProtectedAction(() => timeline.setShowGanttSettings(true))}
-          showAddFeature={currentPage === 'timeline'}
-          addFeatureDisabled={!readiness.canAddFeature}
-          addFeatureHint={
-            !timeline.projectId
-              ? 'Set up a project first.'
-              : !readiness.canAddFeature
-                ? 'Import a feature list or add a product to this project first.'
-                : undefined
-          }
-        />
+        {currentPage === 'timeline' ? (
+          <TimelineToolbar
+            projects={timeline.projects}
+            projectId={timeline.projectId}
+            onProjectChange={handleProjectChange}
+            planLabel={timeline.activePlan?.name}
+            viewMode={timeline.viewMode}
+            onViewScopeChange={timeline.setViewScope}
+            teamsForProject={timeline.teamsForProject}
+            filterTeamId={timeline.filterTeamId}
+            onTeamFilterChange={timeline.setTeamFilter}
+            productsForProject={timeline.productsForProject}
+            filterProductId={timeline.filterProductId}
+            onProductFocusChange={timeline.setProductFocus}
+            searchQuery={featureSearchQuery}
+            onSearchChange={setFeatureSearchQuery}
+            onCollapseAll={timeline.collapseAllSections}
+            onExpandAll={timeline.expandAllSections}
+            onScrollToToday={timeline.scrollToToday}
+            onAddFeature={handleAddFeature}
+            onImportFeatures={handleImportFeatures}
+            importDisabled={!timeline.projectId}
+            importHint={
+              !timeline.projectId
+                ? 'Select a project before importing features.'
+                : 'Import features from a CSV list'
+            }
+            onOpenGanttSettings={() =>
+              requestProtectedAction(() => timeline.setShowGanttSettings(true))
+            }
+            addFeatureDisabled={!readiness.canAddFeature}
+            addFeatureHint={
+              !timeline.projectId
+                ? 'Set up a project first.'
+                : !readiness.canAddFeature
+                  ? 'Import a feature list or add a product to this project first.'
+                  : undefined
+            }
+          />
+        ) : (
+          <TopNav
+            pageTitle={PAGE_TITLES[currentPage] ?? 'Chronova'}
+            variant={currentPage === 'home' ? 'dark' : 'light'}
+            showAddFeature={false}
+          />
+        )}
 
         <div className="flex min-h-0 flex-1 overflow-hidden">{renderMainContent()}</div>
       </div>

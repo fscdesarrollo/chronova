@@ -28,6 +28,7 @@ migrateStorageKeys()
 
 const DEFAULT_LAYOUT = {
   sidebarCollapsed: false,
+  sidebarCollapsedTimeline: true,
   leftColCollapsed: false,
   leftColWidth: 280,
 }
