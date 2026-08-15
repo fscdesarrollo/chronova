@@ -13,7 +13,7 @@ export default function TimelineHeader({
 
   if (!weeks.length) {
     return (
-      <div className="bg-header px-4 py-6 text-sm text-gray-400">
+      <div className="bg-header px-4 py-3 text-xs text-gray-400">
         No iteration plan assigned. Open Iterations to configure a calendar for this project.
       </div>
     )
@@ -21,7 +21,7 @@ export default function TimelineHeader({
 
   return (
     <div className="bg-header text-white" style={{ width }}>
-      <div className="relative min-h-[26px]">
+      <div className="relative min-h-[18px]">
         {todayPosition != null && <TodayHeaderMarker left={todayPosition} />}
         {markerGroups.map((group) => (
           <GroupedMarkerHeader
@@ -37,11 +37,11 @@ export default function TimelineHeader({
         {timeboxes.map((pi) => (
           <div
             key={pi.id}
-            className="border-r border-white/15 px-3 py-2"
+            className="border-r border-white/15 px-2 py-1"
             style={{ width: pi.width ?? pi.weekCount * WEEK_WIDTH }}
           >
-            <div className="text-sm font-semibold">{pi.name}</div>
-            <div className="text-[10px] text-gray-400">{pi.range}</div>
+            <div className="text-xs font-semibold leading-tight">{pi.name}</div>
+            <div className="text-[9px] leading-tight text-gray-400">{pi.range}</div>
           </div>
         ))}
       </div>
@@ -57,9 +57,9 @@ export default function TimelineHeader({
               className="border-r border-white/10"
               style={{ width: sprintWidth }}
             >
-              <div className={`border-b border-white/10 px-2 py-1.5 text-center ${sprintWeeks[0]?.sprintBg ?? 'bg-sprint-dev'}`}>
-                <div className="text-xs font-semibold">{sprint.name}</div>
-                <div className="text-[10px] text-gray-300">
+              <div className={`border-b border-white/10 px-1.5 py-1 text-center ${sprintWeeks[0]?.sprintBg ?? 'bg-sprint-dev'}`}>
+                <div className="text-[11px] font-semibold leading-tight">{sprint.name}</div>
+                <div className="text-[9px] leading-tight text-gray-300">
                   {sprint.range}
                   {sprint.scale && sprint.scale !== 'week' ? ` · ${sprint.scale}` : ''}
                 </div>
@@ -68,11 +68,11 @@ export default function TimelineHeader({
                 {sprintWeeks.map((week) => (
                   <div
                     key={week.index}
-                    className={`border-r border-white/10 px-0.5 py-1 text-center ${week.sprintBg}`}
+                    className={`border-r border-white/10 px-0.5 py-0.5 text-center ${week.sprintBg}`}
                     style={{ width: week.width ?? WEEK_WIDTH }}
                   >
-                    <div className="truncate text-[10px] font-medium">{week.label}</div>
-                    <div className="truncate text-[9px] text-gray-400">{week.displayDate}</div>
+                    <div className="truncate text-[9px] font-medium leading-tight">{week.label}</div>
+                    <div className="truncate text-[8px] leading-tight text-gray-400">{week.displayDate}</div>
                   </div>
                 ))}
               </div>

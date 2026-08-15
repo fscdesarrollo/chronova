@@ -7,7 +7,7 @@ export function TodayHeaderMarker({ left }) {
       style={{ left, top: 0 }}
       aria-hidden
     >
-      <div className="absolute left-0 -translate-x-1/2 rounded-full bg-sky-500 px-2 py-0.5 text-[10px] font-semibold uppercase text-white shadow-sm">
+      <div className="absolute left-0 -translate-x-1/2 rounded-full bg-sky-500 px-1.5 py-px text-[9px] font-semibold uppercase leading-tight text-white shadow-sm">
         TODAY
       </div>
     </div>
@@ -30,7 +30,7 @@ export function TimelineMarkerHeader({ marker, left, stackIndex = 0 }) {
   return (
     <div
       className="pointer-events-none absolute z-30"
-      style={{ left, top: 4 + stackIndex * 22 }}
+      style={{ left, top: 4 + stackIndex * 18 }}
       aria-hidden
     >
       <div
@@ -51,7 +51,7 @@ export function GroupedMarkerHeader({ group, expanded, onToggle }) {
   }
 
   return (
-    <div className="absolute z-30" style={{ left: group.left, top: 4 }}>
+    <div className="absolute z-30" style={{ left: group.left, top: 2 }}>
       <button
         type="button"
         onClick={onToggle}
