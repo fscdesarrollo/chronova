@@ -98,17 +98,23 @@ export function loadTimelineView(projectId) {
     return {
       scrollLeft: view.scrollLeft,
       scrollTop: typeof view.scrollTop === 'number' ? view.scrollTop : 0,
+      zoomLevel: typeof view.zoomLevel === 'number' ? view.zoomLevel : undefined,
     }
   } catch {
     return null
   }
 }
 
-export function saveTimelineView(projectId, { scrollLeft, scrollTop }) {
+export function saveTimelineView(projectId, { scrollLeft, scrollTop, zoomLevel }) {
   try {
     const raw = localStorage.getItem(TIMELINE_VIEW_KEY)
     const data = raw ? JSON.parse(raw) : {}
-    data[projectId] = { scrollLeft, scrollTop }
+    const prev = data[projectId] ?? {}
+    data[projectId] = {
+      scrollLeft,
+      scrollTop,
+      ...(typeof zoomLevel === 'number' ? { zoomLevel } : prev.zoomLevel != null ? { zoomLevel: prev.zoomLevel } : {}),
+    }
     localStorage.setItem(TIMELINE_VIEW_KEY, JSON.stringify(data))
   } catch { /* ignore */ }
 }

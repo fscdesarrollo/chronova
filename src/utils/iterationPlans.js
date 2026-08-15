@@ -1,5 +1,6 @@
 import { addDays, addWeeks, formatDay, parseISO, toISODate } from './dates'
 import { DAY_WIDTH, MONTH_WIDTH, WEEK_WIDTH } from '../constants'
+import { DEFAULT_ZOOM_LEVEL, scaledDayWidth, scaledMonthWidth, scaledWeekWidth } from './timelineZoom'
 
 export const SAFE_SPRINT_WEEK_COUNTS = [3, 3, 3, 4]
 export const TIMELINE_SCALES = ['day', 'week', 'month']
@@ -20,10 +21,10 @@ export function normalizeTimelineScale(scale) {
   return TIMELINE_SCALES.includes(s) ? s : 'week'
 }
 
-function widthForScale(scale) {
-  if (scale === 'day') return DAY_WIDTH
-  if (scale === 'month') return MONTH_WIDTH
-  return WEEK_WIDTH
+function widthForScale(scale, zoomLevel = DEFAULT_ZOOM_LEVEL) {
+  if (scale === 'day') return scaledDayWidth(zoomLevel)
+  if (scale === 'month') return scaledMonthWidth(zoomLevel)
+  return scaledWeekWidth(zoomLevel)
 }
 
 /** Build SAFe sprints (3+3+3+4 weeks) from a timebox start date. */
@@ -93,9 +94,9 @@ export function monthLabel(iso) {
   return `${months[d.getMonth()]} ${d.getFullYear()}`
 }
 
-function buildUnitsForSprint(tb, sprint) {
+function buildUnitsForSprint(tb, sprint, zoomLevel = DEFAULT_ZOOM_LEVEL) {
   const scale = normalizeTimelineScale(sprint.scale)
-  const width = widthForScale(scale)
+  const width = widthForScale(scale, zoomLevel)
   const units = []
 
   if (scale === 'day') {
@@ -187,7 +188,7 @@ function buildUnitsForSprint(tb, sprint) {
  * Build Gantt leaf columns + header bands from flat timeboxes + sprints.
  * Each sprint may use scale: day | week | month.
  */
-export function buildCalendarFromPlan(timeboxes = [], sprints = []) {
+export function buildCalendarFromPlan(timeboxes = [], sprints = [], zoomLevel = DEFAULT_ZOOM_LEVEL) {
   const sortedTimeboxes = [...timeboxes].sort((a, b) => {
     const byDate = String(a.startDate).localeCompare(String(b.startDate))
     if (byDate !== 0) return byDate
@@ -210,7 +211,7 @@ export function buildCalendarFromPlan(timeboxes = [], sprints = []) {
       .sort((a, b) => a.number - b.number)
 
     for (const sprint of tbSprints) {
-      const sprintUnits = buildUnitsForSprint(tb, sprint)
+      const sprintUnits = buildUnitsForSprint(tb, sprint, zoomLevel)
       let sprintWidth = 0
       for (const raw of sprintUnits) {
         const unit = {

@@ -1,4 +1,5 @@
 import { DAY_WIDTH, WEEK_WIDTH } from '../constants'
+import { dayColumnTooltip } from '../utils/timelineDayFeatures'
 import { TodayHeaderMarker, GroupedMarkerHeader } from './TimelineMarkers'
 
 export default function TimelineHeader({
@@ -7,6 +8,8 @@ export default function TimelineHeader({
   markerGroups = [],
   expandedMarkerDates = new Set(),
   onToggleMarkerGroup,
+  projectId,
+  features = [],
 }) {
   const {
     timeboxes = [],
@@ -91,18 +94,25 @@ export default function TimelineHeader({
       )}
 
       <div className="flex">
-        {weeks.map((unit) => (
+        {weeks.map((unit) => {
+          const tooltip =
+            unit.isGeneric && projectId
+              ? dayColumnTooltip(features, projectId, unit.startDate)
+              : ''
+          return (
           <div
             key={`${unit.index}-${unit.startDate}`}
             className={`border-r border-white/10 px-0.5 py-0.5 text-center ${
               unit.isGeneric && unit.isWeekend ? 'bg-timeline-weekend-header' : unit.sprintBg ?? ''
             }`}
             style={{ width: unit.width ?? (unit.isGeneric ? DAY_WIDTH : WEEK_WIDTH) }}
+            title={tooltip || undefined}
           >
             <div className="truncate text-[9px] font-medium leading-tight">{unit.label}</div>
             <div className="truncate text-[8px] leading-tight text-gray-400">{unit.displayDate}</div>
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

@@ -6,7 +6,7 @@ import TimelineHeader from './TimelineHeader'
 import { TodayBodyLine, TimelineMarkerBodyLine } from './TimelineMarkers'
 import { useFeatureDrag, ROW_HEIGHT } from '../hooks/useFeatureDrag'
 import { useLeftColResize } from '../hooks/useLeftColResize'
-import { DAY_WIDTH, LEFT_COL_COLLAPSED_WIDTH, SECTION_ROW_HEIGHT, WEEK_WIDTH } from '../constants'
+import { LEFT_COL_COLLAPSED_WIDTH, SECTION_ROW_HEIGHT, WEEK_WIDTH } from '../constants'
 import { loadTimelineView, saveTimelineView } from '../utils/storage'
 import {
   getDateTimelinePosition,
@@ -14,6 +14,7 @@ import {
   scrollLeftForToday,
 } from '../utils/weekCalendar'
 import { daysBetween, DYNAMIC_CALENDAR } from '../utils/dynamicCalendar'
+import { scaledDayWidth, zoomScale } from '../utils/timelineZoom'
 import { rowHeightFor } from '../utils/timelineLayout'
 import { buildGroupedMarkerLayout } from '../utils/markerGroups'
 import { evaluateFormattingRules } from '../utils/formattingRules'
@@ -48,6 +49,13 @@ export default function TimelineGrid({
   highlightProductId = null,
   emptyMessage = 'No features yet. Use "Add Feature" to get started.',
   onExtendRange,
+  zoomLevel = 1,
+  zoomLabel = 'Normal',
+  canZoomIn = false,
+  canZoomOut = false,
+  onZoomIn,
+  onZoomOut,
+  onScrollToToday,
 }) {
   const weekCalendar = calendar?.weeks ?? []
   const totalWeeks = calendar?.totalWeeks ?? 0
@@ -62,6 +70,7 @@ export default function TimelineGrid({
   const shouldPersistViewRef = useRef(false)
   const extendingRangeRef = useRef(false)
   const prevRangeStartRef = useRef(null)
+  const prevZoomScaleRef = useRef(zoomScale(zoomLevel))
   const scrollPositionRef = useRef({ scrollLeft: 0, scrollTop: 0 })
   const [expandedMarkerDates, setExpandedMarkerDates] = useState(() => new Set())
   const [featureSearchQuery, setFeatureSearchQuery] = useState('')
@@ -171,11 +180,27 @@ export default function TimelineGrid({
     const prevStart = prevRangeStartRef.current
     if (prevStart && calendar.rangeStart < prevStart) {
       const daysAdded = daysBetween(calendar.rangeStart, prevStart)
-      applyScroll(grid.scrollLeft + daysAdded * DAY_WIDTH, grid.scrollTop)
+      applyScroll(grid.scrollLeft + daysAdded * scaledDayWidth(zoomLevel), grid.scrollTop)
       shouldPersistViewRef.current = true
     }
     prevRangeStartRef.current = calendar.rangeStart
-  }, [calendar?.rangeStart, applyScroll, gridRef])
+  }, [calendar?.rangeStart, applyScroll, gridRef, zoomLevel])
+
+  useEffect(() => {
+    const grid = gridRef.current
+    const newScale = zoomScale(zoomLevel)
+    const oldScale = prevZoomScaleRef.current
+    if (!grid || !scrollInitializedRef.current || newScale === oldScale) {
+      prevZoomScaleRef.current = newScale
+      return
+    }
+
+    const centerPx = grid.scrollLeft + grid.clientWidth / 2
+    const newScrollLeft = centerPx * (newScale / oldScale) - grid.clientWidth / 2
+    applyScroll(Math.max(0, newScrollLeft), grid.scrollTop)
+    shouldPersistViewRef.current = true
+    prevZoomScaleRef.current = newScale
+  }, [zoomLevel, applyScroll, gridRef])
 
   useEffect(() => {
     const grid = gridRef.current
@@ -224,9 +249,9 @@ export default function TimelineGrid({
   useEffect(() => {
     return () => {
       if (!shouldPersistViewRef.current) return
-      saveTimelineView(projectId, scrollPositionRef.current)
+      saveTimelineView(projectId, { ...scrollPositionRef.current, zoomLevel })
     }
-  }, [projectId])
+  }, [projectId, zoomLevel])
 
   const syncScrollTop = useCallback((source, target) => {
     if (!source || !target || scrollSyncRef.current) return
@@ -297,6 +322,12 @@ export default function TimelineGrid({
             searchQuery={featureSearchQuery}
             onSearchChange={setFeatureSearchQuery}
             searchInputRef={searchInputRef}
+            onScrollToToday={onScrollToToday}
+            zoomLabel={zoomLabel}
+            canZoomIn={canZoomIn}
+            canZoomOut={canZoomOut}
+            onZoomIn={onZoomIn}
+            onZoomOut={onZoomOut}
           />
         </div>
         <div
@@ -310,6 +341,8 @@ export default function TimelineGrid({
             markerGroups={markerGroups}
             expandedMarkerDates={expandedMarkerDates}
             onToggleMarkerGroup={toggleMarkerGroup}
+            projectId={projectId}
+            features={allFeatures}
           />
         </div>
       </div>

@@ -37,7 +37,7 @@ Required columns: **Feature name** and **Product**. Team, dates, and notes are o
 ## Highlights
 
 - **Home** — brand hero (`TimeHorizon`), animated wordmark, product tour entry
-- **Timeline (Gantt)** — main planning view; drag bars, team sections, backlog, TODAY marker, infinite day scroll (weekends shaded)
+- **Timeline (Gantt)** — main planning view; drag bars, team sections, backlog, TODAY marker, infinite day scroll, **Today** button and 4-level zoom in the feature panel header
 - **Iterations** — reusable SAFe calendars (PIs, sprints, per-sprint day/week/month scale)
 - **Projects / Teams / Products** — configuration pages that feed the Gantt
 - **Product tour** (`app-intro`) — spotlight walkthrough with real navigation; relaunchable from Home
@@ -60,7 +60,7 @@ src/
   components/onboarding/  SetupWizard, TourRunner, GanttSetupChecklist, TourCtaHighlight
   tours/            Tour definitions (registry pattern for per-page tours)
   hooks/            useTimelineState, useFeatureDrag, useLeftColResize
-  utils/            dates, storage, navigation, onboarding, ganttReadiness, dynamicCalendar, migration, featureImport, …
+  utils/            dates, storage, navigation, onboarding, ganttReadiness, dynamicCalendar, timelineZoom, migration, featureImport, …
   data.js           Seed data
 docs/               Product documentation + [feature-import-example.csv](docs/feature-import-example.csv)
 ```
