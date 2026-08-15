@@ -547,6 +547,21 @@ When **both** `filterTeamId` and `filterProductId` are set and the product has o
 
 **Rejected for product focus:** hiding non-product rows; separate Timeline screen per product.
 
+#### Feature search (Timeline)
+
+A search field in the feature panel header filters visible rows by feature name or ID.
+
+| Rule | Behavior |
+|------|----------|
+| Scope | Applies to current `timelineRows` (after View/Team sidebar filters), using fully expanded sections as the search base |
+| Match | Case-insensitive substring on `feature.name` or `String(feature.id)` |
+| Effect | Hides non-matching feature rows in **both** the feature panel and Gantt body (row alignment preserved) |
+| Sections | Sections with no matches are hidden; sections with matches are shown **expanded** while search is active |
+| Persistence | Not persisted — cleared on project change or page reload |
+| Empty | `No features match "{query}".` when the filter has no results |
+
+Product focus dimming still applies on visible rows after search filtering.
+
 | Screen / area | Content |
 |---------------|---------|
 | Sidebar | Grouped nav: **Home** · Timeline · Projects, Iterations, Teams, Products; **User** name; active project + **View** / **Team** / **Product** controls (Timeline only) |
@@ -561,7 +576,7 @@ When **both** `filterTeamId` and `filterProductId` are set and the product has o
 | Plan markers | Per-project vertical markers; grouped pill when same date; expand to list; single body line per date |
 | Feature rows | ID, name, product color dot, SP badge, notes/comments icons, missing-dates icon, assignment alert, dates, Gantt bar (planned only) |
 | Backlog section | Features without team — panel row only, no Gantt bar |
-| Feature name panel | Split-pane left column — shared header row with timeline; bodies scroll in sync below |
+| Feature name panel | Split-pane left column — shared header row with timeline; search by name or ID; bodies scroll in sync below |
 | Footer | Feature count with **valid Gantt bar** only, total SPs (same scope), moved count; when product focus is active, stats are scoped to the focused product; cross-team hint when team + product focus hide features in other teams; drag hints |
 | Feature detail (on click) | Name, team, dates (locked when Delivered), notes, dependencies, US; Comments and History at end; **Save changes**; closes on click outside (with unsaved prompt) |
 
@@ -1368,4 +1383,5 @@ Build on MVP 1.5 without adding a backend:
 | 2026-08-09 | **Onboarding:** product tour (`app-intro`), setup wizard, Gantt checklist, `ganttReadiness`, `setupProjectForGantt`; navigation memory (`chronova-navigation`) |
 | 2026-08-09 | UI: User label in sidebar (replaces Actor modal); feature panel UX polish; Delivered locks dates; dependency ID normalization |
 | 2026-08-09 | First-visit **Take a tour** CTA highlight on Home |
+| 2026-08-14 | **Feature search:** filter feature panel + Gantt rows by name or ID; auto-expand matching sections; not persisted |
 | 2026-08-14 | **Product focus:** highlight/dim (not hide); independent Team + Product sidebar controls; footer cross-team hint with tooltip; `filterProductId` in state |

@@ -317,6 +317,19 @@ export function useTimelineState() {
     [timelineEnrichedFeatures, viewMode, filterTeamId, teams, projectTeams, projectId, collapsedForProject],
   )
 
+  const timelineRowsExpanded = useMemo(
+    () =>
+      buildTimelineRows(timelineEnrichedFeatures, {
+        viewMode,
+        filterTeamId,
+        teams,
+        projectTeams,
+        projectId,
+        collapsedSections: [],
+      }),
+    [timelineEnrichedFeatures, viewMode, filterTeamId, teams, projectTeams, projectId],
+  )
+
   const displayFeatures = useMemo(
     () => timelineRows.filter((r) => r.type === 'feature').map((r) => r.feature),
     [timelineRows],
@@ -1524,6 +1537,7 @@ export function useTimelineState() {
     features: displayFeatures,
     ganttFeatures,
     timelineRows,
+    timelineRowsExpanded,
     allFeatures: enrichedFeatures,
     selectedFeature,
     selectedFeatureId,

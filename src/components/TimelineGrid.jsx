@@ -17,6 +17,7 @@ import { rowHeightFor } from '../utils/timelineLayout'
 import { buildGroupedMarkerLayout } from '../utils/markerGroups'
 import { evaluateFormattingRules } from '../utils/formattingRules'
 import { getDependencyRelatedIds } from '../utils/dependencies'
+import { filterTimelineRowsBySearch } from '../utils/timelineSearch'
 
 function rowHeight(row) {
   return rowHeightFor(row)
@@ -26,6 +27,7 @@ export default function TimelineGrid({
   projectId,
   calendar,
   timelineRows,
+  timelineRowsExpanded = timelineRows,
   allFeatures = [],
   markers = [],
   formattingRules = [],
@@ -61,9 +63,17 @@ export default function TimelineGrid({
   const shouldPersistViewRef = useRef(false)
   const scrollPositionRef = useRef({ scrollLeft: 0, scrollTop: 0 })
   const [expandedMarkerDates, setExpandedMarkerDates] = useState(() => new Set())
+  const [featureSearchQuery, setFeatureSearchQuery] = useState('')
+  const searchInputRef = useRef(null)
+
+  const displayRows = useMemo(() => {
+    const trimmed = featureSearchQuery.trim()
+    if (!trimmed) return timelineRows
+    return filterTimelineRowsBySearch(timelineRowsExpanded, trimmed)
+  }, [featureSearchQuery, timelineRows, timelineRowsExpanded])
 
   const { gridRef, rowsRef, drag, beginDrag } = useFeatureDrag(
-    timelineRows,
+    displayRows,
     onMove,
     0,
     calendar,
@@ -149,6 +159,7 @@ export default function TimelineGrid({
     shouldPersistViewRef.current = false
     scrollPositionRef.current = { scrollLeft: 0, scrollTop: 0 }
     setExpandedMarkerDates(new Set())
+    setFeatureSearchQuery('')
   }, [projectId])
 
   useEffect(() => {
@@ -225,7 +236,11 @@ export default function TimelineGrid({
 
   const showFullNames = !leftColCollapsed && leftColWidth >= 340
   const timelineWidth = totalWidth
-  const bodyMinHeight = timelineRows.reduce((sum, row) => sum + rowHeight(row), 0)
+  const bodyMinHeight = displayRows.reduce((sum, row) => sum + rowHeight(row), 0)
+  const hasFeatureRows = displayRows.some((row) => row.type === 'feature')
+  const panelEmptyMessage = featureSearchQuery.trim()
+    ? `No features match "${featureSearchQuery.trim()}".`
+    : emptyMessage
 
   const getRowVisualState = (featureId) => {
     if (dependencyFocusIds) {
@@ -246,6 +261,9 @@ export default function TimelineGrid({
             onToggle={() => onToggleLeftColCollapsed()}
             onCollapseAll={onCollapseAllSections}
             onExpandAll={onExpandAllSections}
+            searchQuery={featureSearchQuery}
+            onSearchChange={setFeatureSearchQuery}
+            searchInputRef={searchInputRef}
           />
         </div>
         <div
@@ -276,7 +294,7 @@ export default function TimelineGrid({
             onScroll={handleLeftScroll}
           >
             <div style={{ minHeight: bodyMinHeight }}>
-              {timelineRows.map((row) => {
+              {displayRows.map((row) => {
                 if (row.type === 'section') {
                   if (leftColCollapsed) {
                     return (
@@ -318,6 +336,11 @@ export default function TimelineGrid({
                   />
                 )
               })}
+              {!leftColCollapsed && !hasFeatureRows && (
+                <div className="flex items-center justify-center border-r border-gray-200 px-4 py-16 text-center text-sm text-gray-400">
+                  {panelEmptyMessage}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -340,7 +363,7 @@ export default function TimelineGrid({
             ))}
 
             <div ref={rowsRef} className="relative">
-              {timelineRows.map((row) => {
+              {displayRows.map((row) => {
                 if (row.type === 'section') {
                   return (
                     <div
@@ -372,9 +395,9 @@ export default function TimelineGrid({
                 )
               })}
 
-              {timelineRows.filter((r) => r.type === 'feature').length === 0 && (
+              {!hasFeatureRows && (
                 <div className="flex items-center justify-center py-16 text-sm text-gray-400">
-                  {emptyMessage}
+                  {panelEmptyMessage}
                 </div>
               )}
             </div>

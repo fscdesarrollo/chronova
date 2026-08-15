@@ -265,6 +265,7 @@ export default function App() {
                 projectId={timeline.projectId}
                 calendar={timeline.projectCalendar}
                 timelineRows={timeline.timelineRows}
+                timelineRowsExpanded={timeline.timelineRowsExpanded}
                 allFeatures={timeline.allFeatures}
                 markers={timeline.markersForProject}
                 formattingRules={timeline.formattingRulesForProject}
