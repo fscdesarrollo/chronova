@@ -3,10 +3,12 @@ import { Plus, Settings } from 'lucide-react'
 export default function TopNav({
   pageTitle,
   planLabel,
+  focusProduct,
   onAddFeature,
   onOpenGanttSettings,
   showAddFeature = true,
   showPlanLabel = false,
+  showFocusLabel = false,
   variant = 'light',
   addFeatureDisabled = false,
   addFeatureHint,
@@ -28,6 +30,19 @@ export default function TopNav({
         {showPlanLabel && planLabel && (
           <p className="text-xs text-gray-500">
             Plan: <span className="text-gray-700">{planLabel}</span>
+          </p>
+        )}
+        {showFocusLabel && focusProduct && (
+          <p className="text-xs text-gray-500">
+            Vista:{' '}
+            <span className="inline-flex items-center gap-1.5 text-gray-700">
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: focusProduct.color }}
+                aria-hidden="true"
+              />
+              {focusProduct.name}
+            </span>
           </p>
         )}
       </div>

@@ -38,7 +38,7 @@ A functional prototype already exists in this repository (React + Vite + Tailwin
 3. **Visual at a glance** — Gantt bars, product colors, deviation warnings, and baseline ghosts communicate state without reading spreadsheets.
 4. **Traceability** — when a feature moves, the Gantt should leave a footprint: who moved it, when, and why.
 5. **Low maintenance** — replace Excel friction with drag-and-drop and automatic calculations (SPs, deviations).
-6. **Project-centric view** — project is the primary unit of organization; multiple teams can work within one project; products provide visual grouping, not separate screens.
+6. **Project-centric view** — project is the primary unit of organization; multiple teams can work within one project; products provide visual grouping and an optional **product focus** highlight — not a separate screen.
 
 ---
 
@@ -134,11 +134,11 @@ Project: CARB Platform
     └── 16, 17...
 ```
 
-**Product semantics:** a Product is a lightweight global identification label (name + color) for visual grouping on the Gantt. Products are assigned to projects via `project_products` — the same product may appear in multiple projects. It is **not** an epic or parent work item in a backlog tree.
+**Product semantics:** a Product is a lightweight global identification label (name + color) for visual grouping on the Gantt. Products are assigned to projects via `project_products` — the same product may appear in multiple projects. A product is **not** exclusive to a single project. Within a project, a product may be **worked on by multiple teams** simultaneously (features with the same `productId` and different `teamId`). It is **not** an epic or parent work item in a backlog tree.
 
 **Hierarchy:** Project → (Backlog | Team) → Feature, with Product as a cross-cutting visual identifier assigned to projects.
 
-Rejected alternatives: timeline per product (fragments the view), timeline per full ART (too noisy for executives), team as the top-level unit (does not reflect multi-team projects).
+Rejected alternatives: separate Timeline screen per product (fragments navigation), timeline per full ART (too noisy for executives), team as the top-level unit (does not reflect multi-team projects), product exclusive to one project (unnecessary constraint for a global catalog).
 
 #### Iterations (calendar plans) — Phase A
 
@@ -509,20 +509,48 @@ Per-page tours (e.g. Timeline-only) are planned via the same tour registry patte
 
 **View filter** (Timeline page — replaces "Team view"):
 
-| Mode | Behavior |
-|------|----------|
-| **All** | Full timeline: Backlog + team sections + Needs reassignment |
-| **Backlog** | Only the Backlog section; same create/edit behavior as All |
-| **{Team name}** | Features for the selected team; **Needs reassignment** section at the bottom (unchanged) |
+Three independent sidebar controls on the Timeline:
 
-Dropdown order: **All → Backlog → teams** (alphabetical or project assignment order).
+| Control | Behavior |
+|---------|----------|
+| **View** | `All` — full timeline; `Backlog` — backlog section only |
+| **Team** | `All` — every team section; `{Team}` — filter rows to that team (+ backlog + needs reassignment) |
+| **Product** | `All` — no product focus; `{Product}` — **highlight** that product's features and dim the rest (same visual treatment as dependency focus) |
 
-State model: `viewMode: 'all' | 'backlog' | 'team'` + `filterTeamId` when `viewMode === 'team'`. Replaces `teamViewMode` / `filterTeamId` pair from MVP 1.6.
+Team filter and product focus are **complementary** — both can be active at the same time.
+
+State model: `viewMode: 'all' | 'backlog'` + optional `filterTeamId` + optional `filterProductId`.
+
+#### Product focus semantics
+
+Product focus is a **highlight lens** on the project Timeline — not a separate page and not a row filter. All rows remain visible (subject to View/Team filters); features whose `productId` does not match are dimmed (`opacity-25`), matching dependency-focus behavior. Selecting a feature with dependencies takes priority over product focus.
+
+When `filterProductId` is set:
+
+1. Matching features stay at full opacity across all visible sections (planned, backlog, needs reassignment).
+2. Non-matching features are dimmed but remain interactive.
+3. Top bar shows **Vista: {product name}** with the product color dot.
+4. Footer stats (count, SPs, delivered, cross-PI) reflect only on-Gantt features of the focused product.
+
+When **both** `filterTeamId` and `filterProductId` are set and the product has on-Gantt features assigned to other teams, the footer shows **N in other teams** with an info icon; tooltip lists the other team names.
+
+**Interactions:** Add Feature pre-fills the focused product (still editable). Drag & drop follows View/Team filter rules; product focus does not restrict drops.
+
+**Edge cases:**
+
+| Event | Behavior |
+|-------|----------|
+| Switch project | Clear team filter if team not in new project; clear product focus if product not assigned |
+| Delete focused product | Clear product focus (delete blocked if product has features) |
+| Unassign product from project | Clear product focus if it was active |
+| Project has no products | Product dropdown shows only All |
+
+**Rejected for product focus:** hiding non-product rows; separate Timeline screen per product.
 
 | Screen / area | Content |
 |---------------|---------|
-| Sidebar | Grouped nav: **Home** · Timeline · Projects, Iterations, Teams, Products; **User** name; active project + **View** filter (Timeline only) |
-| Top bar | Page title; on Timeline only: `Plan: {name}`; **Gantt settings** + **Add Feature** (Timeline only). Dark variant on Home. |
+| Sidebar | Grouped nav: **Home** · Timeline · Projects, Iterations, Teams, Products; **User** name; active project + **View** / **Team** / **Product** controls (Timeline only) |
+| Top bar | Page title; on Timeline only: `Plan: {name}`; when product focus is active: **Vista: {product}** with color dot; **Gantt settings** + **Add Feature** (Timeline only). Dark variant on Home. |
 | Home | `TimeHorizon` background, `BrandWordmark`, pillars, CTAs: **Take a tour**, continue to last page, setup wizard, advanced configuration |
 | Onboarding | See [Onboarding and first-run UX](#onboarding-and-first-run-ux) above |
 | Gantt settings | Gear icon in top bar; modal with **Markers** and **Rules** (editable condition/action builder) tabs |
@@ -534,7 +562,7 @@ State model: `viewMode: 'all' | 'backlog' | 'team'` + `filterTeamId` when `viewM
 | Feature rows | ID, name, product color dot, SP badge, notes/comments icons, missing-dates icon, assignment alert, dates, Gantt bar (planned only) |
 | Backlog section | Features without team — panel row only, no Gantt bar |
 | Feature name panel | Split-pane left column — shared header row with timeline; bodies scroll in sync below |
-| Footer | Feature count with **valid Gantt bar** only, total SPs (same scope), moved count; drag hints |
+| Footer | Feature count with **valid Gantt bar** only, total SPs (same scope), moved count; when product focus is active, stats are scoped to the focused product; cross-team hint when team + product focus hide features in other teams; drag hints |
 | Feature detail (on click) | Name, team, dates (locked when Delivered), notes, dependencies, US; Comments and History at end; **Save changes**; closes on click outside (with unsaved prompt) |
 
 | Interaction | Behavior |
@@ -710,7 +738,7 @@ All data lives in the browser until MVP 3 adds a backend:
 | Timeline scroll position | Per-project view (`chronova-view`); saved on leaving Timeline page; defaults to Today on first visit |
 | Timeline markers | Per-project markers (`timelineMarkers` in main state) |
 | Rules | Per-project rules (`formattingRules` in main state; UI label **Rules**) |
-| View filter | `viewMode` (`all` \| `backlog` \| `team`) + `filterTeamId` when team view |
+| View filter | `viewMode` (`all` \| `backlog`) + optional `filterTeamId` + optional `filterProductId` (highlight) |
 | Collapsed sections | Per-project section collapse state (`collapsedSections` in main state) |
 | PI/sprint calendar | Derived from the project's assigned iteration plan |
 | Multi-user sharing | Not supported — each browser has its own copy |
@@ -740,6 +768,7 @@ docs/             Project documentation (project.md, brand.md)
 {
   "viewMode": "all",
   "filterTeamId": null,
+  "filterProductId": null,
   "collapsedSections": { "proj-carb": ["backlog"] },
   "projects": [{ "id": "proj-carb", "name": "CARB Platform", "createdAt": "..." }],
   "teams": [{ "id": "carb-dp", "name": "CARB Data Platform", "createdAt": "..." }],
@@ -1244,7 +1273,7 @@ Build on MVP 1.5 without adding a backend:
 | 19 | Feature dependencies | Resolved (depends on only; highlight + list; no SVG in MVP 1.6) |
 | 20 | Marker grouping | Resolved (generic pill; expand to header labels + popover; single body line) |
 | 21 | Optional dates + team assign gate | Resolved — team selectable while editing; dates required on Save when team assigned |
-| 22 | View filter (All / Backlog / Team) | Resolved (MVP 1.7 — replaces Team view) |
+| 22 | View filter (All / Backlog / Team / Product focus) | Resolved (MVP 1.7 team view; product focus added post-1.7) |
 | 23 | Collapsible sections | Resolved (MVP 1.7 — all sections + collapse/expand all) |
 | 24 | Rule criteria builder | Resolved (MVP 1.7 — editable conditions; Completed overdue rule) |
 | 25 | Feature name edit | Resolved (detail panel only; no inline row edit) |
@@ -1339,3 +1368,4 @@ Build on MVP 1.5 without adding a backend:
 | 2026-08-09 | **Onboarding:** product tour (`app-intro`), setup wizard, Gantt checklist, `ganttReadiness`, `setupProjectForGantt`; navigation memory (`chronova-navigation`) |
 | 2026-08-09 | UI: User label in sidebar (replaces Actor modal); feature panel UX polish; Delivered locks dates; dependency ID normalization |
 | 2026-08-09 | First-visit **Take a tour** CTA highlight on Home |
+| 2026-08-14 | **Product focus:** highlight/dim (not hide); independent Team + Product sidebar controls; footer cross-team hint with tooltip; `filterProductId` in state |

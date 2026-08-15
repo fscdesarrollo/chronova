@@ -32,13 +32,23 @@ export function derivePlanningStatus(feature) {
 }
 
 export function migrateViewMode(saved) {
-  if (saved.viewMode) {
-    return { viewMode: saved.viewMode, filterTeamId: saved.filterTeamId ?? null }
+  let viewMode = saved.viewMode ?? 'all'
+  let filterTeamId = saved.filterTeamId ?? null
+  let filterProductId = saved.filterProductId ?? null
+
+  if (viewMode === 'team') {
+    viewMode = 'all'
+  } else if (viewMode === 'product') {
+    viewMode = 'all'
+  } else if (viewMode !== 'backlog') {
+    viewMode = 'all'
   }
-  if (saved.teamViewMode === 'single' && saved.filterTeamId) {
-    return { viewMode: 'team', filterTeamId: saved.filterTeamId }
+
+  if (saved.teamViewMode === 'single' && saved.filterTeamId && !filterTeamId) {
+    filterTeamId = saved.filterTeamId
   }
-  return { viewMode: 'all', filterTeamId: null }
+
+  return { viewMode, filterTeamId, filterProductId }
 }
 
 export function migrateState(saved) {
@@ -57,7 +67,7 @@ export function migrateState(saved) {
     })
     const projects = saved.projects
     const formattingRules = migrateFormattingRules(saved.formattingRules, projects)
-    const { viewMode, filterTeamId } = migrateViewMode(saved)
+    const { viewMode, filterTeamId, filterProductId } = migrateViewMode(saved)
     const normalizedFeatures = (saved.features ?? []).map(normalizeFeature)
     const { features, auditEvents } = migrateNumericFeatureIds(
       normalizedFeatures,
@@ -78,6 +88,7 @@ export function migrateState(saved) {
       projectId: saved.projectId ?? saved.projects[0]?.id ?? DEFAULT_PROJECT_ID,
       viewMode,
       filterTeamId,
+      filterProductId,
       collapsedSections: saved.collapsedSections ?? {},
     }
   }
@@ -138,6 +149,7 @@ function buildFreshState() {
     projectId: DEFAULT_PROJECT_ID,
     viewMode: 'all',
     filterTeamId: null,
+    filterProductId: null,
     collapsedSections: {},
   }
 }
@@ -231,6 +243,7 @@ function migrateLegacyState(saved) {
     projectId: DEFAULT_PROJECT_ID,
     viewMode: 'all',
     filterTeamId: null,
+    filterProductId: null,
     collapsedSections: {},
   }
 

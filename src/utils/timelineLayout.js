@@ -36,7 +36,7 @@ export function findSectionForVisualIndex(timelineRows, visualRowIndex) {
 export function resolveDropTeamTarget(section, { viewMode, filterTeamId }) {
   if (!section) return { teamId: undefined, unassign: false }
 
-  if (viewMode === 'team' && filterTeamId) {
+  if (filterTeamId && viewMode !== 'backlog') {
     if (section.id === 'needs-reassignment') {
       return { teamId: null, unassign: true }
     }

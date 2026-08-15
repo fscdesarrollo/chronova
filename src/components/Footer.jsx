@@ -1,9 +1,14 @@
-import { GripVertical, MoveHorizontal } from 'lucide-react'
+import { GripVertical, Info, MoveHorizontal } from 'lucide-react'
 
-export default function Footer({ features }) {
+export default function Footer({ features, crossTeamInfo }) {
   const totalSPs = features.reduce((sum, f) => sum + (f.storyPoints || 0), 0)
   const completedCount = features.filter((f) => f.completed).length
   const crossPiCount = features.filter((f) => f.crossPi).length
+
+  const crossTeamTooltip =
+    crossTeamInfo?.teamNames?.length > 0
+      ? `Teams: ${crossTeamInfo.teamNames.join(', ')}`
+      : ''
 
   return (
     <footer className="flex shrink-0 items-center justify-between border-t border-gray-200 bg-white px-6 py-3 text-sm text-gray-600">
@@ -24,6 +29,18 @@ export default function Footer({ features }) {
             <span className="text-gray-300">|</span>
             <span>
               <strong className="font-semibold text-amber-600">{crossPiCount}</strong> cross-PI
+            </span>
+          </>
+        )}
+        {crossTeamInfo && (
+          <>
+            <span className="text-gray-300">|</span>
+            <span className="flex items-center gap-1.5 text-amber-700">
+              <strong className="font-semibold">{crossTeamInfo.featureCount}</strong>
+              in other teams
+              <span title={crossTeamTooltip} className="cursor-help text-amber-600">
+                <Info size={14} aria-label={crossTeamTooltip} />
+              </span>
             </span>
           </>
         )}

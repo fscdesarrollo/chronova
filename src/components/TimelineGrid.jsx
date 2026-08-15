@@ -42,6 +42,8 @@ export default function TimelineGrid({
   selectedFeatureId,
   onSelectFeature,
   onDeselectFeature,
+  highlightProductId = null,
+  emptyMessage = 'No features yet. Use "Add Feature" to get started.',
 }) {
   const weekCalendar = calendar?.weeks ?? []
   const totalWeeks = calendar?.totalWeeks ?? 0
@@ -88,6 +90,15 @@ export default function TimelineGrid({
     if (!selectedFeatureId) return null
     return getDependencyRelatedIds(selectedFeatureId, allFeatures)
   }, [selectedFeatureId, allFeatures])
+
+  const productFocusIds = useMemo(() => {
+    if (!highlightProductId) return null
+    return new Set(
+      allFeatures
+        .filter((f) => f.projectId === projectId && f.productId === highlightProductId)
+        .map((f) => f.id),
+    )
+  }, [highlightProductId, allFeatures, projectId])
 
   const toggleMarkerGroup = useCallback((date) => {
     setExpandedMarkerDates((prev) => {
@@ -217,8 +228,13 @@ export default function TimelineGrid({
   const bodyMinHeight = timelineRows.reduce((sum, row) => sum + rowHeight(row), 0)
 
   const getRowVisualState = (featureId) => {
-    if (!dependencyFocusIds) return { isDimmed: false }
-    return { isDimmed: !dependencyFocusIds.has(featureId) }
+    if (dependencyFocusIds) {
+      return { isDimmed: !dependencyFocusIds.has(featureId) }
+    }
+    if (productFocusIds) {
+      return { isDimmed: !productFocusIds.has(featureId) }
+    }
+    return { isDimmed: false }
   }
 
   return (
@@ -358,7 +374,7 @@ export default function TimelineGrid({
 
               {timelineRows.filter((r) => r.type === 'feature').length === 0 && (
                 <div className="flex items-center justify-center py-16 text-sm text-gray-400">
-                  No features yet. Use &quot;Add Feature&quot; to get started.
+                  {emptyMessage}
                 </div>
               )}
             </div>

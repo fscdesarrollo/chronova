@@ -289,8 +289,12 @@ export default function App() {
                 selectedFeatureId={timeline.selectedFeatureId}
                 onSelectFeature={requestSelectFeature}
                 onDeselectFeature={requestDeselectFeature}
+                highlightProductId={timeline.filterProductId}
               />
-              <Footer features={timeline.ganttFeatures} />
+              <Footer
+                features={timeline.ganttFeatures}
+                crossTeamInfo={timeline.productFocusCrossTeamInfo}
+              />
             </div>
 
             {timeline.selectedFeature && (
@@ -350,9 +354,13 @@ export default function App() {
         projectId={timeline.projectId}
         onProjectChange={handleProjectChange}
         teamsForProject={timeline.teamsForProject}
+        productsForProject={timeline.productsForProject}
         viewMode={timeline.viewMode}
         filterTeamId={timeline.filterTeamId}
-        onViewChange={timeline.setViewFilter}
+        filterProductId={timeline.filterProductId}
+        onViewScopeChange={timeline.setViewScope}
+        onTeamFilterChange={timeline.setTeamFilter}
+        onProductFocusChange={timeline.setProductFocus}
         actor={timeline.actor}
         onActorChange={timeline.setActor}
       />
@@ -361,7 +369,9 @@ export default function App() {
         <TopNav
           pageTitle={PAGE_TITLES[currentPage] ?? 'Timeline'}
           planLabel={timeline.activePlan?.name}
+          focusProduct={timeline.focusedProduct}
           showPlanLabel={currentPage === 'timeline'}
+          showFocusLabel={currentPage === 'timeline' && Boolean(timeline.filterProductId)}
           variant={currentPage === 'home' ? 'dark' : 'light'}
           onAddFeature={handleAddFeature}
           onOpenGanttSettings={() => requestProtectedAction(() => timeline.setShowGanttSettings(true))}
@@ -383,6 +393,7 @@ export default function App() {
         onSave={timeline.addFeature}
         teams={timeline.teamsForProject}
         products={timeline.productsForProject}
+        defaultProductId={timeline.filterProductId ?? undefined}
         defaultDates={defaultDates}
         canPlanOnGantt={readiness.canAddPlannedFeature}
       />

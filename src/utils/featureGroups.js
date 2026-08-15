@@ -25,65 +25,27 @@ function sectionWithFeatures(section, features, collapsedSections) {
   ]
 }
 
-export function buildTimelineRows(
-  features,
-  { viewMode, filterTeamId, teams, projectTeams, projectId, collapsedSections = [] },
-) {
-  const projectFeatures = features.filter((f) => f.projectId === projectId)
-  const assignedTeamIds = projectTeams
-    .filter((pt) => pt.projectId === projectId)
-    .map((pt) => pt.teamId)
-
-  const teamMap = Object.fromEntries(teams.map((t) => [t.id, t]))
-
-  const backlog = projectFeatures.filter((f) => f.planningStatus === 'backlog')
-  const planned = projectFeatures.filter((f) => f.planningStatus === 'planned')
-  const needsReassignment = planned.filter((f) => f.assignmentStatus === 'team_unassigned')
-  const assignedPlanned = planned.filter((f) => f.assignmentStatus === 'ok')
-
-  const backlogSection = {
-    id: 'backlog',
-    label: 'Backlog',
-    count: backlog.length,
-  }
-
-  const needsReassignmentSection = (items) => ({
+function needsReassignmentSection(items) {
+  return {
     id: 'needs-reassignment',
     label: 'Needs reassignment',
     count: items.length,
     alert: true,
-  })
-
-  if (viewMode === 'backlog') {
-    if (!backlog.length) return []
-    return sectionWithFeatures(backlogSection, backlog, collapsedSections)
   }
+}
 
-  if (viewMode === 'team' && filterTeamId) {
-    const matched = assignedPlanned.filter((f) => f.teamId === filterTeamId)
-    const rows = []
-    if (matched.length) {
-      rows.push(
-        ...sectionWithFeatures(
-          {
-            id: `team-${filterTeamId}`,
-            label: teamMap[filterTeamId]?.name ?? 'Team',
-            count: matched.length,
-          },
-          matched,
-          collapsedSections,
-        ),
-      )
-    }
-    if (backlog.length) {
-      rows.push(...sectionWithFeatures(backlogSection, backlog, collapsedSections))
-    }
-    if (needsReassignment.length) {
-      rows.push(
-        ...sectionWithFeatures(needsReassignmentSection(needsReassignment), needsReassignment, collapsedSections),
-      )
-    }
-    return rows
+function buildTeamGroupedRows({
+  backlog,
+  assignedPlanned,
+  needsReassignment,
+  assignedTeamIds,
+  teamMap,
+  collapsedSections,
+}) {
+  const backlogSection = {
+    id: 'backlog',
+    label: 'Backlog',
+    count: backlog.length,
   }
 
   const rows = []
@@ -123,6 +85,79 @@ export function buildTimelineRows(
       ),
     )
   }
+
+  return rows
+}
+
+export function buildTimelineRows(
+  features,
+  {
+    viewMode,
+    filterTeamId,
+    teams,
+    projectTeams,
+    projectId,
+    collapsedSections = [],
+  },
+) {
+  const projectFeatures = features.filter((f) => f.projectId === projectId)
+  const assignedTeamIds = projectTeams
+    .filter((pt) => pt.projectId === projectId)
+    .map((pt) => pt.teamId)
+
+  const teamMap = Object.fromEntries(teams.map((t) => [t.id, t]))
+
+  const backlog = projectFeatures.filter((f) => f.planningStatus === 'backlog')
+  const planned = projectFeatures.filter((f) => f.planningStatus === 'planned')
+  const needsReassignment = planned.filter((f) => f.assignmentStatus === 'team_unassigned')
+  const assignedPlanned = planned.filter((f) => f.assignmentStatus === 'ok')
+
+  const backlogSection = {
+    id: 'backlog',
+    label: 'Backlog',
+    count: backlog.length,
+  }
+
+  if (viewMode === 'backlog') {
+    if (!backlog.length) return []
+    return sectionWithFeatures(backlogSection, backlog, collapsedSections)
+  }
+
+  if (filterTeamId && viewMode !== 'backlog') {
+    const matched = assignedPlanned.filter((f) => f.teamId === filterTeamId)
+    const rows = []
+    if (matched.length) {
+      rows.push(
+        ...sectionWithFeatures(
+          {
+            id: `team-${filterTeamId}`,
+            label: teamMap[filterTeamId]?.name ?? 'Team',
+            count: matched.length,
+          },
+          matched,
+          collapsedSections,
+        ),
+      )
+    }
+    if (backlog.length) {
+      rows.push(...sectionWithFeatures(backlogSection, backlog, collapsedSections))
+    }
+    if (needsReassignment.length) {
+      rows.push(
+        ...sectionWithFeatures(needsReassignmentSection(needsReassignment), needsReassignment, collapsedSections),
+      )
+    }
+    return rows
+  }
+
+  const rows = buildTeamGroupedRows({
+    backlog,
+    assignedPlanned,
+    needsReassignment,
+    assignedTeamIds,
+    teamMap,
+    collapsedSections,
+  })
 
   if (!rows.length && projectFeatures.length) {
     return featureRows(projectFeatures)

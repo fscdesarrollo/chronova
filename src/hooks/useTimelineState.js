@@ -173,6 +173,7 @@ export function useTimelineState() {
   const [projectId, setProjectId] = useState(initial.projectId)
   const [viewMode, setViewMode] = useState(initial.viewMode ?? 'all')
   const [filterTeamId, setFilterTeamId] = useState(initial.filterTeamId)
+  const [filterProductId, setFilterProductId] = useState(initial.filterProductId ?? null)
   const [collapsedSections, setCollapsedSections] = useState(initial.collapsedSections ?? {})
   const [selectedFeatureId, setSelectedFeatureId] = useState(null)
   const [featureEditPreview, setFeatureEditPreviewState] = useState(null)
@@ -326,10 +327,37 @@ export function useTimelineState() {
     [enrichedFeatures, selectedFeatureId],
   )
 
-  const ganttFeatures = useMemo(
-    () => enrichedFeatures.filter((f) => f.projectId === projectId && f.onGantt),
-    [enrichedFeatures, projectId],
-  )
+  const ganttFeatures = useMemo(() => {
+    let list = enrichedFeatures.filter((f) => f.projectId === projectId && f.onGantt)
+    if (filterProductId) {
+      list = list.filter((f) => f.productId === filterProductId)
+    }
+    return list
+  }, [enrichedFeatures, projectId, filterProductId])
+
+  const focusedProduct = useMemo(() => {
+    if (!filterProductId) return null
+    return products.find((p) => p.id === filterProductId) ?? null
+  }, [filterProductId, products])
+
+  const productFocusCrossTeamInfo = useMemo(() => {
+    if (!filterProductId || !filterTeamId) return null
+    const productOnGantt = enrichedFeatures.filter(
+      (f) => f.projectId === projectId && f.onGantt && f.productId === filterProductId,
+    )
+    const otherTeamIds = [
+      ...new Set(
+        productOnGantt
+          .map((f) => f.teamId)
+          .filter((teamId) => teamId && teamId !== filterTeamId),
+      ),
+    ]
+    if (!otherTeamIds.length) return null
+    return {
+      featureCount: productOnGantt.filter((f) => f.teamId && f.teamId !== filterTeamId).length,
+      teamNames: otherTeamIds.map((id) => teams.find((t) => t.id === id)?.name ?? 'Team'),
+    }
+  }, [enrichedFeatures, projectId, filterProductId, filterTeamId, teams])
 
   const markersForProject = useMemo(
     () => timelineMarkers.filter((m) => m.projectId === projectId),
@@ -364,6 +392,7 @@ export function useTimelineState() {
       projectId,
       viewMode,
       filterTeamId,
+      filterProductId,
       collapsedSections,
     })
   }, [
@@ -383,6 +412,7 @@ export function useTimelineState() {
     projectId,
     viewMode,
     filterTeamId,
+    filterProductId,
     collapsedSections,
   ])
 
@@ -797,10 +827,38 @@ export function useTimelineState() {
     [actor, projectId, addAuditEvent],
   )
 
-  const setViewFilter = useCallback((mode, teamId = null) => {
-    setViewMode(mode)
-    setFilterTeamId(mode === 'team' ? teamId : null)
+  const setViewScope = useCallback((mode) => {
+    setViewMode(mode === 'backlog' ? 'backlog' : 'all')
   }, [])
+
+  const setTeamFilter = useCallback((teamId) => {
+    setFilterTeamId(teamId || null)
+  }, [])
+
+  const setProductFocus = useCallback((productId) => {
+    setFilterProductId(productId || null)
+  }, [])
+
+  const changeProjectId = useCallback(
+    (nextProjectId) => {
+      setProjectId(nextProjectId)
+      if (filterTeamId) {
+        const teamIds = projectTeams
+          .filter((pt) => pt.projectId === nextProjectId)
+          .map((pt) => pt.teamId)
+        if (!teamIds.includes(filterTeamId)) {
+          setFilterTeamId(null)
+        }
+      }
+      if (filterProductId) {
+        const ids = productIdsForProject(projectProducts, nextProjectId)
+        if (!ids.has(filterProductId)) {
+          setFilterProductId(null)
+        }
+      }
+    },
+    [filterTeamId, filterProductId, projectTeams, projectProducts],
+  )
 
   const toggleSectionCollapsed = useCallback((sectionId) => {
     setCollapsedSections((prev) => {
@@ -1088,10 +1146,10 @@ export function useTimelineState() {
       setProjectTeams((prev) => prev.filter((pt) => pt.teamId !== id))
       setTeams((prev) => prev.filter((t) => t.id !== id))
       addAuditEvent(createEvent('team.deleted', actor, null, { id }))
-      if (filterTeamId === id) setViewFilter('all')
+      if (filterTeamId === id) setTeamFilter(null)
       return { ok: true }
     },
-    [actor, featuresRaw, filterTeamId, addAuditEvent, setViewFilter],
+    [actor, featuresRaw, filterTeamId, addAuditEvent, setTeamFilter],
   )
 
   const assignTeamToProject = useCallback(
@@ -1168,11 +1226,14 @@ export function useTimelineState() {
           ...projectIds.map((pid) => ({ projectId: pid, productId })),
         ]
       })
+      if (filterProductId === productId && !projectIds.includes(projectId)) {
+        setProductFocus(null)
+      }
       addAuditEvent(
         createEvent('product.projects_updated', actor, null, { productId, projectIds }),
       )
     },
-    [actor, addAuditEvent],
+    [actor, addAuditEvent, filterProductId, projectId, setProductFocus],
   )
 
   const assignProductToProject = useCallback(
@@ -1195,11 +1256,14 @@ export function useTimelineState() {
       setProjectProducts((prev) =>
         prev.filter((pp) => !(pp.projectId === targetProjectId && pp.productId === productId)),
       )
+      if (filterProductId === productId && targetProjectId === projectId) {
+        setProductFocus(null)
+      }
       addAuditEvent(
         createEvent('product.unassigned', actor, null, { projectId: targetProjectId, productId }),
       )
     },
-    [actor, projectId, addAuditEvent],
+    [actor, projectId, addAuditEvent, filterProductId, setProductFocus],
   )
   const updateProduct = useCallback(
     (id, updates) => {
@@ -1235,9 +1299,10 @@ export function useTimelineState() {
       setProducts((prev) => prev.filter((p) => p.id !== id))
       setProjectProducts((prev) => prev.filter((pp) => pp.productId !== id))
       addAuditEvent(createEvent('product.deleted', actor, null, { id }))
+      if (filterProductId === id) setProductFocus(null)
       return { ok: true }
     },
-    [actor, featuresRaw, addAuditEvent],
+    [actor, featuresRaw, addAuditEvent, filterProductId, setProductFocus],
   )
 
   const resetToSeed = useCallback(() => {
@@ -1257,6 +1322,7 @@ export function useTimelineState() {
     setProjectId(seedProjects[0].id)
     setViewMode('all')
     setFilterTeamId(null)
+    setFilterProductId(null)
     setCollapsedSections({})
     eventIdCounter = 1
   }, [])
@@ -1445,11 +1511,16 @@ export function useTimelineState() {
     activePlan,
     currentTimebox,
     projectId,
-    setProjectId,
+    setProjectId: changeProjectId,
     activeProject,
     viewMode,
     filterTeamId,
-    setViewFilter,
+    filterProductId,
+    focusedProduct,
+    productFocusCrossTeamInfo,
+    setViewScope,
+    setTeamFilter,
+    setProductFocus,
     features: displayFeatures,
     ganttFeatures,
     timelineRows,

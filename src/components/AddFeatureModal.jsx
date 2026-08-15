@@ -10,6 +10,7 @@ export default function AddFeatureModal({
   teams,
   products,
   defaultDates,
+  defaultProductId,
   canPlanOnGantt = true,
 }) {
   const [name, setName] = useState('')
@@ -26,7 +27,7 @@ export default function AddFeatureModal({
     setName('')
     const defaultTeam = canPlanOnGantt && teams[0]?.id ? teams[0].id : BACKLOG_VALUE
     setTeamId(defaultTeam)
-    setProductId(products[0]?.id ?? '')
+    setProductId(defaultProductId ?? products[0]?.id ?? '')
     if (defaultTeam === BACKLOG_VALUE) {
       setStartDate('')
       setTargetDate('')
@@ -35,7 +36,7 @@ export default function AddFeatureModal({
       setTargetDate(defaultDates.targetDate)
     }
     setError('')
-  }, [open, products, teams, canPlanOnGantt, defaultDates.startDate, defaultDates.targetDate])
+  }, [open, products, teams, canPlanOnGantt, defaultDates.startDate, defaultDates.targetDate, defaultProductId])
 
   const handleTeamChange = (value) => {
     setTeamId(value)

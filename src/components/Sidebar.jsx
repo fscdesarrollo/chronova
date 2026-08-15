@@ -37,9 +37,13 @@ export default function Sidebar({
   projectId,
   onProjectChange,
   teamsForProject,
+  productsForProject = [],
   viewMode,
   filterTeamId,
-  onViewChange,
+  filterProductId,
+  onViewScopeChange,
+  onTeamFilterChange,
+  onProductFocusChange,
   actor,
   onActorChange,
 }) {
@@ -128,24 +132,42 @@ export default function Sidebar({
               View
             </label>
             <select
-              value={viewMode === 'all' ? 'all' : viewMode === 'backlog' ? 'backlog' : filterTeamId ?? ''}
-              onChange={(e) => {
-                const val = e.target.value
-                if (val === 'all') {
-                  onViewChange('all')
-                } else if (val === 'backlog') {
-                  onViewChange('backlog')
-                } else {
-                  onViewChange('team', val)
-                }
-              }}
-              className="mb-2 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white focus:border-violet-400 focus:outline-none"
+              value={viewMode === 'backlog' ? 'backlog' : 'all'}
+              onChange={(e) => onViewScopeChange(e.target.value)}
+              className="mb-3 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white focus:border-violet-400 focus:outline-none"
             >
               <option value="all" className="text-gray-900">All</option>
               <option value="backlog" className="text-gray-900">Backlog</option>
+            </select>
+
+            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+              Team
+            </label>
+            <select
+              value={filterTeamId ?? ''}
+              onChange={(e) => onTeamFilterChange(e.target.value || null)}
+              className="mb-3 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white focus:border-violet-400 focus:outline-none"
+            >
+              <option value="" className="text-gray-900">All</option>
               {teamsForProject.map((t) => (
                 <option key={t.id} value={t.id} className="text-gray-900">
                   {t.name}
+                </option>
+              ))}
+            </select>
+
+            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+              Product
+            </label>
+            <select
+              value={filterProductId ?? ''}
+              onChange={(e) => onProductFocusChange(e.target.value || null)}
+              className="mb-2 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white focus:border-violet-400 focus:outline-none"
+            >
+              <option value="" className="text-gray-900">All</option>
+              {productsForProject.map((p) => (
+                <option key={p.id} value={p.id} className="text-gray-900">
+                  {p.name}
                 </option>
               ))}
             </select>
