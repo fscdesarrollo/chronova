@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   CalendarDays,
   ChevronDown,
@@ -11,7 +11,16 @@ import {
   X,
 } from 'lucide-react'
 
-function FilterChip({ label, value, active, onClear, children, open, onToggle }) {
+function FilterChip({
+  label,
+  value,
+  active,
+  accentColor,
+  onClear,
+  children,
+  open,
+  onToggle,
+}) {
   return (
     <div className="relative">
       <div
@@ -23,6 +32,13 @@ function FilterChip({ label, value, active, onClear, children, open, onToggle })
       >
         <button type="button" onClick={onToggle} className="flex min-w-0 items-center gap-1">
           <span className="text-gray-500">{label}:</span>
+          {accentColor && (
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: accentColor }}
+              aria-hidden
+            />
+          )}
           <span className="max-w-[7rem] truncate">{value}</span>
           <ChevronDown size={12} className="shrink-0 opacity-60" />
         </button>
@@ -50,8 +66,15 @@ function FilterMenu({ options, value, onChange, onClose }) {
     const handleClick = (e) => {
       if (ref.current && !ref.current.contains(e.target)) onClose()
     }
+    const handleKey = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
     document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKey)
+    }
   }, [onClose])
 
   return (
@@ -115,8 +138,8 @@ export default function TimelineToolbar({
   const [productMenuOpen, setProductMenuOpen] = useState(false)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const mobileFiltersRef = useRef(null)
+  const searchInputRef = useRef(null)
 
-  const activeProject = projects.find((p) => p.id === projectId)
   const selectedTeam = teamsForProject.find((t) => t.id === filterTeamId)
   const selectedProduct = productsForProject.find((p) => p.id === filterProductId)
   const activeFilterCount = (filterTeamId ? 1 : 0) + (filterProductId ? 1 : 0)
@@ -130,6 +153,12 @@ export default function TimelineToolbar({
     ...productsForProject.map((p) => ({ id: p.id, label: p.name, color: p.color })),
   ]
 
+  const closeAllMenus = useCallback(() => {
+    setTeamMenuOpen(false)
+    setProductMenuOpen(false)
+    setMobileFiltersOpen(false)
+  }, [])
+
   useEffect(() => {
     if (!mobileFiltersOpen) return
     const handleClick = (e) => {
@@ -137,9 +166,30 @@ export default function TimelineToolbar({
         setMobileFiltersOpen(false)
       }
     }
+    const handleKey = (e) => {
+      if (e.key === 'Escape') setMobileFiltersOpen(false)
+    }
     document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKey)
+    }
   }, [mobileFiltersOpen])
+
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key === 'Escape') closeAllMenus()
+      if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const tag = document.activeElement?.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+        e.preventDefault()
+        searchInputRef.current?.focus()
+      }
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [closeAllMenus])
 
   const viewIsBacklog = viewMode === 'backlog'
 
@@ -149,11 +199,14 @@ export default function TimelineToolbar({
       className="shrink-0 border-b border-gray-200 bg-white"
     >
       {/* Row 1 — context + actions */}
-      <div className="flex min-h-11 items-center justify-between gap-4 border-b border-gray-100 px-4 py-1.5">
+      <div className="flex items-center justify-between gap-4 border-b border-gray-100 px-4 py-2">
         <div className="flex min-w-0 items-center gap-3">
           <div className="min-w-0">
-            <label className="sr-only" htmlFor="timeline-active-project">
-              Active project
+            <label
+              htmlFor="timeline-active-project"
+              className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-gray-400"
+            >
+              Project
             </label>
             <select
               id="timeline-active-project"
@@ -171,11 +224,8 @@ export default function TimelineToolbar({
             </select>
             {planLabel && (
               <p className="mt-0.5 truncate text-[10px] text-gray-500">
-                Plan: <span className="text-gray-600">{planLabel}</span>
+                Plan: <span className="font-medium text-gray-600">{planLabel}</span>
               </p>
-            )}
-            {!planLabel && activeProject && (
-              <p className="mt-0.5 truncate text-[10px] text-gray-400">{activeProject.name}</p>
             )}
           </div>
         </div>
@@ -189,26 +239,40 @@ export default function TimelineToolbar({
           >
             <Settings size={16} />
           </button>
-          <button
-            type="button"
-            data-tour="import-features"
-            onClick={onImportFeatures}
-            title={importHint ?? 'Import features from CSV'}
-            disabled={importDisabled}
-            className={`hidden items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-medium sm:flex ${
-              importDisabled
-                ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
-                : 'border-gray-200 text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            <Upload size={14} />
-            Import
-          </button>
+          <div className="flex" data-tour="import-features">
+            <button
+              type="button"
+              onClick={onImportFeatures}
+              title={importHint ?? 'Import features from CSV'}
+              disabled={importDisabled}
+              className={`flex h-8 w-8 items-center justify-center rounded-lg border sm:hidden ${
+                importDisabled
+                  ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              <Upload size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={onImportFeatures}
+              title={importHint ?? 'Import features from CSV'}
+              disabled={importDisabled}
+              className={`hidden items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-medium sm:flex ${
+                importDisabled
+                  ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
+                  : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <Upload size={14} />
+              Import
+            </button>
+          </div>
           <button
             type="button"
             onClick={onAddFeature}
             title={addFeatureHint}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white ${
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white shadow-sm ${
               addFeatureDisabled
                 ? 'cursor-not-allowed bg-violet-400 opacity-80'
                 : 'bg-violet-600 hover:bg-violet-700'
@@ -222,10 +286,12 @@ export default function TimelineToolbar({
       </div>
 
       {/* Row 2 — filters + search + view controls */}
-      <div className="flex h-9 items-center gap-2 px-4">
-        {/* View segmented control */}
+      <div
+        data-tour="timeline-filters"
+        className="flex h-9 items-center gap-2 bg-gray-50/80 px-4"
+      >
         <div
-          className="flex shrink-0 rounded-lg border border-gray-200 p-0.5"
+          className="flex shrink-0 rounded-lg border border-gray-200 bg-white p-0.5"
           role="group"
           aria-label="View scope"
         >
@@ -253,7 +319,6 @@ export default function TimelineToolbar({
           </button>
         </div>
 
-        {/* Desktop filter chips */}
         <div className="hidden items-center gap-1.5 lg:flex">
           <FilterChip
             label="Team"
@@ -278,6 +343,7 @@ export default function TimelineToolbar({
             label="Product"
             value={selectedProduct?.name ?? 'All'}
             active={Boolean(filterProductId)}
+            accentColor={filterProductId ? selectedProduct?.color : undefined}
             onClear={() => onProductFocusChange(null)}
             open={productMenuOpen}
             onToggle={() => {
@@ -294,7 +360,6 @@ export default function TimelineToolbar({
           </FilterChip>
         </div>
 
-        {/* Mobile / narrow: filters menu */}
         <div className="relative lg:hidden" ref={mobileFiltersRef}>
           <button
             type="button"
@@ -302,7 +367,7 @@ export default function TimelineToolbar({
             className={`flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium ${
               activeFilterCount > 0
                 ? 'border-violet-300 bg-violet-50 text-violet-800'
-                : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
             }`}
           >
             <Filter size={12} />
@@ -350,7 +415,6 @@ export default function TimelineToolbar({
           )}
         </div>
 
-        {/* Search */}
         <div className="relative min-w-0 flex-1">
           <Search
             size={13}
@@ -358,11 +422,13 @@ export default function TimelineToolbar({
             aria-hidden
           />
           <input
+            ref={searchInputRef}
             type="search"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search by name or ID…"
-            className="w-full rounded-lg border border-gray-200 py-1 pl-7 pr-7 text-xs text-gray-900 placeholder:text-gray-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400"
+            title="Press / to focus search"
+            className="w-full rounded-lg border border-gray-200 bg-white py-1 pl-7 pr-7 text-xs text-gray-900 placeholder:text-gray-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400"
           />
           {searchQuery && (
             <button
@@ -376,16 +442,14 @@ export default function TimelineToolbar({
           )}
         </div>
 
-        {/* Reserved for future zoom control */}
         <div className="hidden w-8 shrink-0 sm:block" aria-hidden />
 
-        {/* View controls */}
         <div className="flex shrink-0 items-center gap-0.5">
           <button
             type="button"
             onClick={onExpandAll}
             title="Expand all sections"
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 hover:bg-white hover:text-gray-800"
           >
             <ChevronDown size={15} />
           </button>
@@ -393,7 +457,7 @@ export default function TimelineToolbar({
             type="button"
             onClick={onCollapseAll}
             title="Collapse all sections"
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 hover:bg-white hover:text-gray-800"
           >
             <ChevronUp size={15} />
           </button>
@@ -401,7 +465,7 @@ export default function TimelineToolbar({
             type="button"
             onClick={onScrollToToday}
             title="Go to today"
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 hover:bg-white hover:text-gray-800"
           >
             <CalendarDays size={15} />
           </button>

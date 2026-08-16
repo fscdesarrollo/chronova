@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 export default function FeaturePanelHeader({ collapsed, onToggle }) {
   return (
-    <div className="flex min-h-[4.5rem] shrink-0 flex-col justify-end self-stretch border-b border-r border-white/10 bg-header px-2 pb-2 pt-1.5">
+    <div className="flex h-full min-h-0 shrink-0 flex-col justify-end self-stretch border-b border-r border-white/10 bg-header px-2 pb-2 pt-1.5">
       <div className="flex min-w-0 items-center gap-1">
         {!collapsed && (
           <span className="truncate px-1 text-xs font-medium text-white">Features</span>
