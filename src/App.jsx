@@ -319,6 +319,7 @@ export default function App() {
                 }}
                 onToggleSectionCollapsed={timeline.toggleSectionCollapsed}
                 searchQuery={featureSearchQuery}
+                onSearchChange={setFeatureSearchQuery}
                 onMove={timeline.moveFeature}
                 selectedFeatureId={timeline.selectedFeatureId}
                 onSelectFeature={requestSelectFeature}

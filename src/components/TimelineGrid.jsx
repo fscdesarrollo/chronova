@@ -48,6 +48,7 @@ export default function TimelineGrid({
   emptyMessage = 'No features yet. Use "Add Feature" to get started.',
   onExtendRange,
   searchQuery = '',
+  onSearchChange,
 }) {
   const weekCalendar = calendar?.weeks ?? []
   const totalWeeks = calendar?.totalWeeks ?? 0
@@ -159,8 +160,8 @@ export default function TimelineGrid({
     scrollPositionRef.current = { scrollLeft: 0, scrollTop: 0 }
     prevRangeStartRef.current = null
     setExpandedMarkerDates(new Set())
-    setFeatureSearchQuery('')
-  }, [projectId])
+    onSearchChange?.('')
+  }, [projectId, onSearchChange])
 
   useEffect(() => {
     const grid = gridRef.current
