@@ -33,22 +33,10 @@ export default function Sidebar({
   onToggleCollapsed,
   currentPage,
   onNavigate,
-  projects,
-  projectId,
-  onProjectChange,
-  teamsForProject,
-  productsForProject = [],
-  viewMode,
-  filterTeamId,
-  filterProductId,
-  onViewScopeChange,
-  onTeamFilterChange,
-  onProductFocusChange,
   actor,
   onActorChange,
+  activeProjectName,
 }) {
-  const activeProject = projects.find((p) => p.id === projectId)
-
   return (
     <aside
       className={`flex shrink-0 flex-col bg-sidebar text-white transition-all duration-200 ${
@@ -81,7 +69,7 @@ export default function Sidebar({
         </button>
       </div>
 
-      <nav className="border-b border-white/10 p-2" data-tour="sidebar-nav">
+      <nav className="flex-1 overflow-y-auto border-b border-white/10 p-2" data-tour="sidebar-nav">
         {NAV_GROUPS.map((group, groupIndex) => (
           <div key={groupIndex}>
             {groupIndex > 0 && (
@@ -110,77 +98,6 @@ export default function Sidebar({
         ))}
       </nav>
 
-      <div className="flex-1 overflow-y-auto p-3">
-        {!collapsed && currentPage === 'timeline' && (
-          <>
-            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-              Active project
-            </label>
-            <select
-              value={projectId}
-              onChange={(e) => onProjectChange(e.target.value)}
-              disabled={projects.length === 0}
-              className="mb-4 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white focus:border-violet-400 focus:outline-none disabled:opacity-50"
-            >
-              {projects.length === 0 && (
-                <option value="" className="text-gray-900">
-                  No project yet
-                </option>
-              )}
-              {projects.map((p) => (
-                <option key={p.id} value={p.id} className="text-gray-900">
-                  {p.name}
-                </option>
-              ))}
-            </select>
-
-            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-              View
-            </label>
-            <select
-              value={viewMode === 'backlog' ? 'backlog' : 'all'}
-              onChange={(e) => onViewScopeChange(e.target.value)}
-              className="mb-3 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white focus:border-violet-400 focus:outline-none"
-            >
-              <option value="all" className="text-gray-900">All</option>
-              <option value="backlog" className="text-gray-900">Backlog</option>
-            </select>
-
-            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-              Team
-            </label>
-            <select
-              value={filterTeamId ?? ''}
-              onChange={(e) => onTeamFilterChange(e.target.value || null)}
-              className="mb-3 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white focus:border-violet-400 focus:outline-none"
-            >
-              <option value="" className="text-gray-900">All</option>
-              {teamsForProject.map((t) => (
-                <option key={t.id} value={t.id} className="text-gray-900">
-                  {t.name}
-                </option>
-              ))}
-            </select>
-
-            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-              Product
-            </label>
-            <select
-              value={filterProductId ?? ''}
-              onChange={(e) => onProductFocusChange(e.target.value || null)}
-              className="mb-2 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white focus:border-violet-400 focus:outline-none"
-            >
-              <option value="" className="text-gray-900">All</option>
-              {productsForProject.map((p) => (
-                <option key={p.id} value={p.id} className="text-gray-900">
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </>
-        )}
-      </div>
-
       <div className="border-t border-white/10 p-3" data-tour="sidebar-user">
         {!collapsed ? (
           <>
@@ -194,7 +111,9 @@ export default function Sidebar({
               placeholder="Your name"
               className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white placeholder:text-gray-500 focus:border-violet-400 focus:outline-none"
             />
-            <p className="mt-1 truncate text-[10px] text-gray-500">{activeProject?.name}</p>
+            {activeProjectName && (
+              <p className="mt-1 truncate text-[10px] text-gray-500">{activeProjectName}</p>
+            )}
           </>
         ) : (
           <div

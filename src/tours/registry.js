@@ -36,7 +36,21 @@ export const TOURS = {
         page: 'timeline',
         target: '[data-tour="sidebar-nav"]',
         title: 'Navigation',
-        body: 'Home and Timeline are your main views. Configuration pages live in the group below.',
+        body: 'Home and Timeline are your main views. Configuration pages (Projects, Iterations, Teams, Products) live in the group below. Your display name is at the bottom.',
+      },
+      {
+        id: 'timeline-toolbar',
+        page: 'timeline',
+        target: '[data-tour="timeline-toolbar"]',
+        title: 'Timeline controls',
+        body: 'Pick the active project, filter by team or product, search features, and use Import or Add Feature — all from this toolbar above the Gantt.',
+      },
+      {
+        id: 'timeline-filters',
+        page: 'timeline',
+        target: '[data-tour="timeline-filters"]',
+        title: 'Filters and search',
+        body: 'Switch between All and Backlog, narrow by team or product (active filters are highlighted), and search by feature name or ID.',
       },
       {
         id: 'timeline',
@@ -50,7 +64,7 @@ export const TOURS = {
         page: 'timeline',
         target: '[data-tour="import-features"]',
         title: 'Import a feature list',
-        body: 'Bring work from Excel or Google Sheets. Download the example CSV, map columns, match products and teams, then preview before anything is saved. New products are created and assigned to this project.',
+        body: 'Use Import in the toolbar to bring work from Excel or Google Sheets. Download the example CSV, map columns, match products and teams, then preview before anything is saved.',
       },
       {
         id: 'projects',

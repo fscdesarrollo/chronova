@@ -40,8 +40,6 @@ export default function TimelineGrid({
   onLeftColWidthChange,
   onToggleLeftColCollapsed,
   onToggleSectionCollapsed,
-  onCollapseAllSections,
-  onExpandAllSections,
   onMove,
   selectedFeatureId,
   onSelectFeature,
@@ -49,7 +47,8 @@ export default function TimelineGrid({
   highlightProductId = null,
   emptyMessage = 'No features yet. Use "Add Feature" to get started.',
   onExtendRange,
-  onScrollToToday,
+  searchQuery = '',
+  onSearchChange,
 }) {
   const weekCalendar = calendar?.weeks ?? []
   const totalWeeks = calendar?.totalWeeks ?? 0
@@ -66,14 +65,12 @@ export default function TimelineGrid({
   const prevRangeStartRef = useRef(null)
   const scrollPositionRef = useRef({ scrollLeft: 0, scrollTop: 0 })
   const [expandedMarkerDates, setExpandedMarkerDates] = useState(() => new Set())
-  const [featureSearchQuery, setFeatureSearchQuery] = useState('')
-  const searchInputRef = useRef(null)
 
   const displayRows = useMemo(() => {
-    const trimmed = featureSearchQuery.trim()
+    const trimmed = searchQuery.trim()
     if (!trimmed) return timelineRows
     return filterTimelineRowsBySearch(timelineRowsExpanded, trimmed)
-  }, [featureSearchQuery, timelineRows, timelineRowsExpanded])
+  }, [searchQuery, timelineRows, timelineRowsExpanded])
 
   const { gridRef, rowsRef, drag, beginDrag } = useFeatureDrag(
     displayRows,
@@ -163,8 +160,8 @@ export default function TimelineGrid({
     scrollPositionRef.current = { scrollLeft: 0, scrollTop: 0 }
     prevRangeStartRef.current = null
     setExpandedMarkerDates(new Set())
-    setFeatureSearchQuery('')
-  }, [projectId])
+    onSearchChange?.('')
+  }, [projectId, onSearchChange])
 
   useEffect(() => {
     const grid = gridRef.current
@@ -273,8 +270,8 @@ export default function TimelineGrid({
   const timelineWidth = totalWidth
   const bodyMinHeight = displayRows.reduce((sum, row) => sum + rowHeight(row), 0)
   const hasFeatureRows = displayRows.some((row) => row.type === 'feature')
-  const panelEmptyMessage = featureSearchQuery.trim()
-    ? `No features match "${featureSearchQuery.trim()}".`
+  const panelEmptyMessage = searchQuery.trim()
+    ? `No features match "${searchQuery.trim()}".`
     : emptyMessage
 
   const getRowVisualState = (featureId) => {
@@ -304,12 +301,6 @@ export default function TimelineGrid({
           <FeaturePanelHeader
             collapsed={leftColCollapsed}
             onToggle={() => onToggleLeftColCollapsed()}
-            onCollapseAll={onCollapseAllSections}
-            onExpandAll={onExpandAllSections}
-            searchQuery={featureSearchQuery}
-            onSearchChange={setFeatureSearchQuery}
-            searchInputRef={searchInputRef}
-            onScrollToToday={onScrollToToday}
           />
         </div>
         <div
