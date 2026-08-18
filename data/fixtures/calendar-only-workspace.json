@@ -1,0 +1,68 @@
+{
+  "exportVersion": 1,
+  "exportedAt": "2026-08-18T00:00:00.000Z",
+  "dataRevision": 2,
+  "projects": [],
+  "teams": [],
+  "projectTeams": [],
+  "products": [],
+  "projectProducts": [],
+  "iterationPlans": [
+    {
+      "id": "plan-safe-2026",
+      "name": "SAFe 2026",
+      "methodology": "safe",
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    }
+  ],
+  "timeboxes": [
+    {
+      "id": "26.2",
+      "planId": "plan-safe-2026",
+      "name": "PI 26.2",
+      "startDate": "2026-05-06",
+      "endDate": "2026-08-04",
+      "sortOrder": 0
+    },
+    {
+      "id": "26.3",
+      "planId": "plan-safe-2026",
+      "name": "PI 26.3",
+      "startDate": "2026-08-05",
+      "endDate": "2026-11-03",
+      "sortOrder": 1
+    },
+    {
+      "id": "26.4",
+      "planId": "plan-safe-2026",
+      "name": "PI 26.4",
+      "startDate": "2026-11-04",
+      "endDate": "2027-02-02",
+      "sortOrder": 2
+    }
+  ],
+  "sprints": [
+    { "id": "26.2.1", "timeboxId": "26.2", "number": 1, "name": "26.2.1", "type": "DEVELOPMENT", "scale": "week", "startDate": "2026-05-06", "endDate": "2026-05-26", "weekCount": 3 },
+    { "id": "26.2.2", "timeboxId": "26.2", "number": 2, "name": "26.2.2", "type": "DEVELOPMENT", "scale": "week", "startDate": "2026-05-27", "endDate": "2026-06-16", "weekCount": 3 },
+    { "id": "26.2.3", "timeboxId": "26.2", "number": 3, "name": "26.2.3", "type": "DEVELOPMENT", "scale": "week", "startDate": "2026-06-17", "endDate": "2026-07-07", "weekCount": 3 },
+    { "id": "26.2.4", "timeboxId": "26.2", "number": 4, "name": "26.2.4", "type": "INNOVATION", "scale": "week", "startDate": "2026-07-08", "endDate": "2026-08-04", "weekCount": 4 },
+    { "id": "26.3.1", "timeboxId": "26.3", "number": 1, "name": "26.3.1", "type": "DEVELOPMENT", "scale": "week", "startDate": "2026-08-05", "endDate": "2026-08-25", "weekCount": 3 },
+    { "id": "26.3.2", "timeboxId": "26.3", "number": 2, "name": "26.3.2", "type": "DEVELOPMENT", "scale": "week", "startDate": "2026-08-26", "endDate": "2026-09-15", "weekCount": 3 },
+    { "id": "26.3.3", "timeboxId": "26.3", "number": 3, "name": "26.3.3", "type": "DEVELOPMENT", "scale": "week", "startDate": "2026-09-16", "endDate": "2026-10-06", "weekCount": 3 },
+    { "id": "26.3.4", "timeboxId": "26.3", "number": 4, "name": "26.3.4", "type": "INNOVATION", "scale": "week", "startDate": "2026-10-07", "endDate": "2026-11-03", "weekCount": 4 },
+    { "id": "26.4.1", "timeboxId": "26.4", "number": 1, "name": "26.4.1", "type": "DEVELOPMENT", "scale": "week", "startDate": "2026-11-04", "endDate": "2026-11-24", "weekCount": 3 },
+    { "id": "26.4.2", "timeboxId": "26.4", "number": 2, "name": "26.4.2", "type": "DEVELOPMENT", "scale": "week", "startDate": "2026-11-25", "endDate": "2026-12-15", "weekCount": 3 },
+    { "id": "26.4.3", "timeboxId": "26.4", "number": 3, "name": "26.4.3", "type": "DEVELOPMENT", "scale": "week", "startDate": "2026-12-16", "endDate": "2027-01-05", "weekCount": 3 },
+    { "id": "26.4.4", "timeboxId": "26.4", "number": 4, "name": "26.4.4", "type": "INNOVATION", "scale": "week", "startDate": "2027-01-06", "endDate": "2027-02-02", "weekCount": 4 }
+  ],
+  "projectIterationPlans": [],
+  "features": [],
+  "timelineMarkers": [],
+  "formattingRules": [],
+  "auditEvents": [],
+  "projectId": "",
+  "viewMode": "all",
+  "filterTeamId": null,
+  "filterProductId": null,
+  "collapsedSections": {}
+}

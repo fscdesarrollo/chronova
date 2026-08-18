@@ -1500,28 +1500,108 @@ export function useTimelineState() {
     [actor, featuresRaw, addAuditEvent, filterProductId, setProductFocus],
   )
 
-  const resetToSeed = useCallback(() => {
-    const fresh = buildFreshState()
-    setProjects(fresh.projects)
-    setTeams(fresh.teams)
-    setProjectTeams(fresh.projectTeams)
-    setProducts(fresh.products)
-    setProjectProducts(fresh.projectProducts)
-    setIterationPlans(fresh.iterationPlans)
-    setTimeboxes(fresh.timeboxes)
-    setPlanSprints(fresh.sprints)
-    setProjectIterationPlans(fresh.projectIterationPlans)
-    setFeaturesRaw(fresh.features)
-    setTimelineMarkers(fresh.timelineMarkers)
-    setFormattingRules(fresh.formattingRules)
-    setAuditEvents(fresh.auditEvents)
-    setProjectId(fresh.projectId)
-    setViewMode(fresh.viewMode)
-    setFilterTeamId(null)
-    setFilterProductId(null)
-    setCollapsedSections({})
-    eventIdCounter = 1
+  const applyWorkspaceState = useCallback((state) => {
+    setProjects(state.projects)
+    setTeams(state.teams)
+    setProjectTeams(state.projectTeams)
+    setProducts(state.products)
+    setProjectProducts(state.projectProducts)
+    setIterationPlans(state.iterationPlans)
+    setTimeboxes(state.timeboxes)
+    setPlanSprints(state.sprints)
+    setProjectIterationPlans(state.projectIterationPlans)
+    setFeaturesRaw(state.features)
+    setTimelineMarkers(state.timelineMarkers)
+    setFormattingRules(state.formattingRules)
+    setAuditEvents(state.auditEvents)
+    setProjectId(state.projectId)
+    setViewMode(state.viewMode)
+    setFilterTeamId(state.filterTeamId ?? null)
+    setFilterProductId(state.filterProductId ?? null)
+    setCollapsedSections(state.collapsedSections ?? {})
+    setSelectedFeatureId(null)
+    setFeatureEditPreview(null)
+
+    resetIdCounters(state)
+    resetMarkerCounter(state.timelineMarkers ?? [])
+
+    if (state.auditEvents?.length) {
+      eventIdCounter = Math.max(...state.auditEvents.map((e) => e.id)) + 1
+    } else {
+      eventIdCounter = 1
+    }
+
+    const allComments = (state.features ?? []).flatMap((f) => f.comments ?? [])
+    if (allComments.length) {
+      const nums = allComments
+        .map((c) => parseInt(String(c.id).replace(/\D/g, ''), 10))
+        .filter((n) => !Number.isNaN(n))
+      commentIdCounter = nums.length ? Math.max(...nums) + 1 : 1
+    } else {
+      commentIdCounter = 1
+    }
   }, [])
+
+  const getWorkspaceSnapshot = useCallback(
+    () => ({
+      dataRevision: DATA_REVISION,
+      projects,
+      teams,
+      projectTeams,
+      products,
+      projectProducts,
+      iterationPlans,
+      timeboxes,
+      sprints: planSprints,
+      projectIterationPlans,
+      features: featuresRaw,
+      timelineMarkers,
+      formattingRules,
+      auditEvents,
+      projectId,
+      viewMode,
+      filterTeamId,
+      filterProductId,
+      collapsedSections,
+    }),
+    [
+      projects,
+      teams,
+      projectTeams,
+      products,
+      projectProducts,
+      iterationPlans,
+      timeboxes,
+      planSprints,
+      projectIterationPlans,
+      featuresRaw,
+      timelineMarkers,
+      formattingRules,
+      auditEvents,
+      projectId,
+      viewMode,
+      filterTeamId,
+      filterProductId,
+      collapsedSections,
+    ],
+  )
+
+  const importWorkspace = useCallback(
+    (state, { actor: importedActor } = {}) => {
+      if (!state) return { ok: false, error: 'No workspace data to import.' }
+      applyWorkspaceState(state)
+      if (importedActor) {
+        setActorState(importedActor)
+        saveActor(importedActor)
+      }
+      return { ok: true }
+    },
+    [applyWorkspaceState],
+  )
+
+  const resetToSeed = useCallback(() => {
+    applyWorkspaceState(buildFreshState())
+  }, [applyWorkspaceState])
 
   // --- Iteration plan CRUD ---
 
@@ -1803,6 +1883,8 @@ export function useTimelineState() {
     deleteTimebox,
     updateSprint,
     resetToSeed,
+    getWorkspaceSnapshot,
+    importWorkspace,
     currentPiId: currentTimebox?.id ?? null,
     getDefaultFeatureDates,
     extendTimelineRange,
