@@ -3,6 +3,7 @@ import {
   CalendarRange,
   ChevronLeft,
   ChevronRight,
+  Database,
   FolderOpen,
   Home,
   Package,
@@ -36,6 +37,7 @@ export default function Sidebar({
   actor,
   onActorChange,
   activeProjectName,
+  onOpenWorkspaceData,
 }) {
   return (
     <aside
@@ -97,6 +99,18 @@ export default function Sidebar({
           </div>
         ))}
       </nav>
+
+      <div className="border-t border-white/10 p-2">
+        <button
+          type="button"
+          title="Workspace data"
+          onClick={onOpenWorkspaceData}
+          className="mb-0.5 flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
+        >
+          <Database size={18} strokeWidth={1.75} className="shrink-0" />
+          {!collapsed && <span>Workspace data</span>}
+        </button>
+      </div>
 
       <div className="border-t border-white/10 p-3" data-tour="sidebar-user">
         {!collapsed ? (

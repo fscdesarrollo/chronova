@@ -7,6 +7,7 @@ import Footer from './components/Footer'
 import AddFeatureModal from './components/AddFeatureModal'
 import ImportFeaturesWizard from './components/ImportFeaturesWizard'
 import GanttSettingsModal from './components/GanttSettingsModal'
+import WorkspaceDataModal from './components/WorkspaceDataModal'
 import FeatureDetailPanel from './components/FeatureDetailPanel'
 import ProjectsPage from './components/pages/ProjectsPage'
 import TeamsPage from './components/pages/TeamsPage'
@@ -39,6 +40,7 @@ export default function App() {
   const [onboarding, setOnboarding] = useState(loadOnboarding)
   const [showWizard, setShowWizard] = useState(false)
   const [showImportWizard, setShowImportWizard] = useState(false)
+  const [showWorkspaceData, setShowWorkspaceData] = useState(false)
   const [activeTourId, setActiveTourId] = useState(null)
   const [navMemory, setNavMemory] = useState(loadNavigation)
   const [featureSearchQuery, setFeatureSearchQuery] = useState('')
@@ -387,6 +389,7 @@ export default function App() {
         actor={timeline.actor}
         onActorChange={timeline.setActor}
         activeProjectName={activeProject?.name}
+        onOpenWorkspaceData={() => requestProtectedAction(() => setShowWorkspaceData(true))}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -481,6 +484,14 @@ export default function App() {
         onSaveFormattingRules={(rules) => {
           timeline.saveFormattingRules(rules)
         }}
+      />
+
+      <WorkspaceDataModal
+        open={showWorkspaceData}
+        onClose={() => setShowWorkspaceData(false)}
+        actor={timeline.actor}
+        getWorkspaceSnapshot={timeline.getWorkspaceSnapshot}
+        onImportWorkspace={timeline.importWorkspace}
       />
     </div>
   )
